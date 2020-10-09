@@ -7,30 +7,13 @@
 /________// /_//|_||/_//  |___// /________// /________// /________//  /________// /_//  /_// /_//| || /_//
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
-Current Version: 08/10/2020
-Version 1.01
+Current Version: 09/10/2020
+Version 1.02
 
-Changelog
- + 06/10/2020 (v0);
- - Basic card-game completed
-
- + 07/10/2020 (v1.00);
- - Starting a new wave of documentation
- - Version 1.xx will be specifically for playing with the cards, no roles or characters until Version 3.00!
- - Version 1.xx will also largely be based on RANDOMIZATION - all cards will be played/discarded at random, rather than selected
- - New Card-class implemented (removed names of horses for simplicity)
- - New Deck-class implemented (removed strings and redundant methods)
- - New Hand-class implemented (removed strings and redundant methods; draw/discard methods to become "Player-bound")
- - New Player-class started... This might take a while! :D
- - Equipped items now all in one composite list (rather than four separate lists)
-
- + 08/10/2020 (v1.01);
- - Card Selection done by card objects rather than indexing...
- - Generation of Players now done by input (eg. players = generate_players(num)) <-- Needs modification when adding roles/characters
- - Ported some basic in-game checks (eg. range; which is no longer a Player-bound method)
- - Ported simplified game-phase cycles
- - Ported refined armor (Black Shield & Eight-Trigrams) and weapon checks (Black Pommel & Zhuge Crossbow)
- - Streamlining and creating a uniform naming for any variables called x_index or y_player_index
+ + 09/10/2020 (v1.02);
+ - 'Weapon_range' removed from being Player-bound; instead will be calculated, when needed, by reading Player.equipment...
+ - Starting "Player.use_card_effect()"
+ - Minor fixes to main_deck.check_if_empty()
 """
 import random
 
@@ -46,11 +29,11 @@ def generate_players(num=10):
 
 
 # --- Loose Functions
-def calculate_targets_in_physical_range(self, source_index, modifier=0):
+def calculate_targets_in_physical_range(source_index, modifier=0):
     # 'Source_index' refers to which player the range is being calculated from
     # 'Modifier' refers to any bonuses granted/penalized by abilities/equipment
     output = []
-    for item in self.equipment:
+    for item in players[source_index].equipment:
         if item.type == "-1 Horse":
             modifier += 1
             break
@@ -58,8 +41,8 @@ def calculate_targets_in_physical_range(self, source_index, modifier=0):
     for (target_index, target) in enumerate(players):
         if target_index != source_index:
             distance = abs(target_index - source_index)
-            target_modifier = 0
 
+            target_modifier = 0
             for item in target.equipment:
                 if item.type == "+1 Horse":
                     target_modifier += 1
@@ -72,15 +55,17 @@ def calculate_targets_in_physical_range(self, source_index, modifier=0):
     return output
 
 
-def calculate_targets_in_weapon_range(self, source_index, modifier=0, omit=None):
+def calculate_targets_in_weapon_range(source_index, modifier=0, omit=None):
     # 'Source_index' refers to which player the range is being calculated from
     # 'Modifier' refers to any bonuses granted/penalized by abilities/equipment
     # 'Omit' refers to any players that are untargetable during this calculation
     output = []
-    for item in self.equipment:
+    weapon_range = 1
+    for item in players[source_index].equipment:
         if item.type == "-1 Horse":
             modifier += 1
-            break
+        if item.type == "Weapon":
+            weapon_range = item.weapon_range
 
     for (target_index, target) in enumerate(players):
         if target_index != source_index:
@@ -94,7 +79,7 @@ def calculate_targets_in_weapon_range(self, source_index, modifier=0, omit=None)
 
             if distance > len(players) / 2:
                 distance = len(players) - distance
-            if distance - (1 + modifier + (players[source_index].weapon_range)) + (target_modifier) <= 0:
+            if distance - (weapon_range + modifier) + (target_modifier) <= 0:
                 output.append(target_index)
     if omit != None:
         output.remove(omit)
@@ -107,13 +92,12 @@ def calculate_targets_in_weapon_range(self, source_index, modifier=0, omit=None)
 # 3. 'Suit' refers to card-suit written on card ('Spades' (\u2660), 'Clubs' (\u2663), 'Hearts' (\u2665), 'Diamonds' (\u2666))
 # 4. 'CType' refers to card-type (Basic, Tool, Delay-Tool or Equipment (broken down into weapon, armor, -1 horse, +1 horse))
 # 5. 'Effect' refers to the effect that the card performs;
-# For more details on individual cards and their effects, check the flavour-texts within the deck! (look for all_cards)
 # 5a. 'Basic cards': ATTACK (x30), DEFEND (x15), PEACH (x8)
 # 5b. 'Tool cards': BARBARIANS (x3), GRANARY (x2), PEACH GARDENS (x1), RAIN OF ARROWS (x1),
 #                   COERCE (x2), DISMANTLE (x6), DUEL (x3), GREED (x4), NEGATE (x4), STEAL (x5)
 # 5c. 'Delay-Tool cards': ACEDIA (x3), LIGHTNING (x2)
 # 5d. 'Equipment cards': WEAPON (x10), ARMOR (x3), -1 HORSE (x3), +1 HORSE (x3)
-# 6. 'Flavour_text' refers to the description of what the individual card does
+# 6. 'Flavour_text' refers to the description of what the individual card does (for more details, search for all_cards)
 # 7. 'Weapon_range' refers to the range provided by the ten possible weapon-cards (within equipment cards)
 class Card:
     def __init__(self, rank, val, suit, ctype, effect, flavour_text, weapon_range=None):
@@ -379,13 +363,13 @@ class Deck:
         self.contents.append(card)
 
     def remove_from_top(self):
-        card = self.contents[0]
-        self.contents.pop(0)
+        if self == main_deck:
+            main_deck.check_if_empty()
+        card = self.contents.pop(0)
         return card
 
     def discard_from_deck(self, num=1):
         while num > 0:
-            main_deck.check_if_empty()
             discard_deck.add_to_top(self.remove_from_top())
             num -= 1
 
@@ -399,19 +383,17 @@ class Hand(Deck):
 
 # --- A class for individual players and their stats in the game
 # 1. 'Character' is a PLACEHOLDER for future versions when character-cards are introduced!
-# 2. 'Weapon_range' is defaultly set to 1, and increases by having a -1 horse or a weapon equipped; this determines who you can reach with attacks
-# 3. 'Attacks_this_turn' is defaultly set to 0; players can only do 1 ATTACK per turn unless a crossbow is equipped
-# 4. 'Current_health' is defaultly set to 4 (this will change in future versions); when a players' health reaches 0, they are on the BRINK OF DEATH!
-# 5. 'Max_health' is defaultly set to 4 (this will change in future versions); current_health cannot exceed max_health
-# 6. 'Hand' refers to the playing-cards in a players' hand
-# 7. 'Equipment' refers to equipped items; only one of each type of equipment can be equipped at one time
-# 8. 'Pending_judgements' refers to any Delay-Tool cards that have yet to take effect on a player. These take effect at the start of their turn
-# 9. 'Acedia_active' refers to having failed the judgement (above), and this player misses their action-phase of their turn - False by default
-# 10. 'Tools_immunity' refers to having had a Tool-card negated for an individual player - False by default
+# 2. 'Attacks_this_turn' is defaultly set to 0; players can only do 1 ATTACK per turn unless a crossbow is equipped
+# 3. 'Current_health' is defaultly set to 4 (this will change in future versions); when a players' health reaches 0, they are on the BRINK OF DEATH!
+# 4. 'Max_health' is defaultly set to 4 (this will change in future versions); current_health cannot exceed max_health
+# 5. 'Hand' refers to the playing-cards in a players' hand
+# 6. 'Equipment' refers to equipped items; only one of each type of equipment can be equipped at one time
+# 7. 'Pending_judgements' refers to any Delay-Tool cards that have yet to take effect on a player. These take effect at the start of their turn
+# 8. 'Acedia_active' refers to having failed the judgement (above), and this player misses their action-phase of their turn - False by default
+# 9. 'Tools_immunity' refers to having had a Tool-card negated for an individual player - False by default
 class Player:
     def __init__(self):
         self.character = "Placeholder"
-        self.weapon_range = 1
         self.attacks_this_turn = 0
         self.current_health = 4
         self.max_health = 4
@@ -451,16 +433,28 @@ class Player:
             return (character_details)
 
     # Draw/Discard Methods
-    def draw(self, deck_drawn=main_deck, num=1):
+    def draw(self, deck=main_deck, num=1, message=True):
+        # 'deck' refers to which pile the cards are drawn from (eg. main_deck, discard_deck)
+        # 'num' refers to how many cards are being drawn
+        # 'message' refers to whether the game announces how many cards are being drawn
+        if message:
+            if num == 1:
+                print(
+                    f"{num} card has been added to {self.character}'s hand.")
+            else:
+                print(
+                    f"{num} cards have been added to {self.character}'s hand.")
         while num > 0:
-            if deck_drawn == main_deck:
-                main_deck.check_if_empty()
-            card = deck_drawn.remove_from_top()
+            card = deck.remove_from_top()
             self.hand.add_to_top(card)
             num -= 1
 
     def discard(self, mode="Hand", num=1):
+        # 'mode' refers to which cards are permitted to be discarded (eg. only 'hand', or, 'hand + equipment')
+        # 'num' refers to how many cards are being discarded
         if mode == "Hand":
+            if num > len(self.hand.contents):
+                return self.discard_all_cards()
             while num > 0:
                 all_cards = self.hand.contents
                 card = random.choice(all_cards)
@@ -469,6 +463,8 @@ class Player:
                 num -= 1
 
         elif mode == "Handquip":
+            if num > len(self.hand.contents) + len(self.equipment):
+                return self.discard_all_cards()
             while num > 0:
                 all_cards = self.hand.contents + self.equipment
                 card = random.choice(all_cards)
@@ -482,16 +478,215 @@ class Player:
         return card
 
     def discard_all_cards(self, death=False):
+        # 'death' refers to if a player is discarding all cards upon dying, or just discarding all of their own cards (and not pending_judgements)
+        cards_discarded = len(self.hand.contents) + len(self.equipment)
+
         while len(self.hand.contents) > 0:
             discard_deck.add_to_top(self.hand.contents.pop())
 
         while len(self.equipment) > 0:
             discard_deck.add_to_top(self.equipment.pop())
-        self.weapon_range = 1
 
         if death:
+            print(
+                f"{self.character} discarded {cards_discarded} card(s) upon their death.")
+
             while len(self.pending_judgements) > 0:
                 discard_deck.add_to_top(self.pending_judgements.pop())
+
+    # Using Cards/Effects
+    def use_card_effect(self, card, card2=None):
+        # card.ctype == 'Basic':
+        if card.effect2 == "Attack":
+            pass
+
+        if card.effect2 == "Defend":
+            print(
+                f"{self.character}: {card} can only be played as a reaction.")
+
+        if card.effect2 == "Peach":
+            if self.max_health > self.current_health:
+                self.hand.contents.remove(card)
+                discard_deck.add_to_top(card)
+                self.current_health += 1
+                print(
+                    f"{self.character} has used a PEACH to heal by one from {self.current_health -1} to {self.current_health}.")
+            else:
+                print(
+                    f"{self.character}: {card} cannot currently be used on yourself as you are at full-health.")
+
+        # card.ctype == 'Tool':
+        if card.effect2 == "Barbarians":
+            self.hand.contents.remove(card)
+            discard_deck.add_to_top(card)
+            print(
+                f"{self.character} has activated {card}. All players will take one damage (unless playing ATTACK or tool-card negated).")
+
+            check_aoe_negate_loop(players, card, 0, 0, card)
+
+            for player_index, player in enumerate(players):
+                if (player != players[0]) and (player.current_health > 0) and (not player.tools_immunity):
+                    barb_response = player.use_reaction_effect(
+                        "Attack", 1, card, 0, player)
+                    if type(barb_response) == Card:
+                        if (barb_response.effect == "Attack") or (barb_response.effect2 == "Attack"):
+                            print(
+                                f"{player.character} successfully defended against BARBARIANS with {barb_response}.")
+                    else:
+                        print(
+                            f"{player.character} failed to defend from BARBARIANS!")
+                        damage_dealt = 1
+                        player.current_health -= damage_dealt
+                        print(
+                            f"{player.character} takes {damage_dealt} damage ({player.current_health}/{player.max_health} HP remaining).")
+
+                        for item in players:
+                            if item.current_health < 1:
+                                item.check_brink_of_death_loop(player_index, 0)
+
+        if card.effect2 == "Granary":
+            self.hand.contents.remove(card)
+            discard_deck.add_to_top(card)
+            print(f"{self.character} has activated {card}. {len(players)} cards have been flipped from the deck. Everyone takes a card; {self.character} goes first!")
+
+            check_aoe_negate_loop(players, card, 0, 0, card)
+
+            granary = Player()
+            granary.draw(main_deck, len(players), False)
+            for player in players:
+                if not player.tools_immunity:
+                    drawn = random.choice(granary.hand.contents)
+                    granary.hand.contents.remove(drawn)
+                    player.draw(drawn)
+                    print(f"{player.character} has taken {drawn} via GRANARY!")
+
+            for item in granary.hand.contents:
+                discard_deck.add_to_top(granary.hand.remove_from_top)
+
+        if card.effect2 == "Peach Gardens":
+            self.hand.contents.remove(card)
+            discard_deck.add_to_top(card)
+            print(
+                f"{self.character} has activated {card}. All damaged players will be healed by one health (unless negated).")
+
+            check_aoe_negate_loop(players, card, 0, 0, card)
+
+            for player in players:
+                if not player.tools_immunity:
+                    if player.max_health > player.current_health:
+                        player.current_health += 1
+                        print(
+                            f"{player.character} has been healed by one. ({player.current_health}/{player.max_health} HP remaining)")
+
+        if card.effect2 == "Rain of Arrows":
+            pass
+
+        if card.effect2 == "Coerce":
+            pass
+
+        if card.effect2 == "Dismantle":
+            pass
+
+        if card.effect2 == "Duel":
+            pass
+
+        if card.effect2 == "Greed":
+            self.hand.contents.remove(card)
+            discard_deck.add_to_top(card)
+            print(f"{self.character} has played {card}.")
+            if not check_negate_loop(players, card, 0, 0):
+                self.draw(main_deck, 2)
+
+        if card.effect2 == "Negate":
+            print(
+                f"{self.character}: {card} can only be played as a reaction.")
+
+        if card.effect2 == "Steal":
+            pass
+
+        # card.ctype == 'Delay-Tool':
+        if card.effect2 == "Acedia":
+            target = random.choice(players[1:])
+            for item in target.pending_judgements:
+                if item.effect2 == 'Acedia':
+                    print(
+                        f"{target.character} is already pending judgement for ACEDIA!")
+                    return False
+
+            else:
+                self.hand.contents.remove(card)
+                target.pending_judgements.append(card)
+                print(f"{self.character} has placed {card} on {target.character}!")
+
+        if card.effect2 == "Lightning":
+            for item in self.pending_judgements:
+                if item.effect2 == 'Lightning':
+                    print(
+                        f"{self.character}: You cannot play a LIGHTNING when you already have one active on yourself.")
+                    return False
+            else:
+                self.hand.contents.remove(card)
+                self.pending_judgements.append(card)
+                print(f"{self.character} has called {card}.")
+
+        if card.effect2 == "Rations Depleted":
+            pass
+
+        # card.ctype == 'Equipment':
+        if card.ctype == "Weapon":
+            weapon_index = None
+            for item_index, item in enumerate(self.equipment):
+                if item.type == "Weapon":
+                    weapon_index = item_index
+                    break
+
+            if weapon_index != None:
+                discard_deck.add_to_top(self.equipment.pop(weapon_index))
+            self.hand.contents.remove(card)
+            self.equipment.append(card)
+            print(f"{self.character} has equipped {card}.")
+
+        if card.ctype == "Armor":
+            armor_index = None
+            for item_index, item in enumerate(self.equipment):
+                if item.type == "Armor":
+                    armor_index = item_index
+                    break
+
+            if armor_index != None:
+                discard_deck.add_to_top(self.equipment.pop(armor_index))
+            self.hand.contents.remove(card)
+            self.equipment.append(card)
+            print(f"{self.character} has equipped {card}.")
+
+        if card.ctype == "-1 Horse":
+            horse_index = None
+            for item_index, item in enumerate(self.equipment):
+                if item.type == "-1 Horse":
+                    horse_index = item_index
+                    break
+
+            if horse_index != None:
+                discard_deck.add_to_top(self.equipment.pop(horse_index))
+            self.hand.contents.remove(card)
+            self.equipment.append(card)
+            print(f"{self.character} has equipped {card}.")
+
+        if card.ctype == "+1 Horse":
+            horse_index = None
+            for item_index, item in enumerate(self.equipment):
+                if item.type == "+1 Horse":
+                    horse_index = item_index
+                    break
+
+            if horse_index != None:
+                discard_deck.add_to_top(self.equipment.pop(horse_index))
+            self.hand.contents.remove(card)
+            self.equipment.append(card)
+            print(f"{self.character} has equipped {card}.")
+
+    def use_reaction_effect(self):
+        pass
 
     # In-game General Checks
     def check_break_brink_loop(self, amount_healed):
@@ -501,23 +696,30 @@ class Player:
             return False
 
     def check_brink_of_death_loop(self, dying_index=0, source_index=0):
+        # 'dying_index' refers to the player that is on the BRINK OF DEATH
+        # 'source_index' refers to the player that is considered the source of the damage
+
+        if (self.max_health != 0) and (self.current_health < 1):
+            print(f"{self.character} - You are on the brink of death ({self.current_health}/{self.max_health} health), and you must be brought back to life with a PEACH or WINE.")
+            reacting_index = dying_index
+
         # Regular Brink of Death Loop
         for player in players[dying_index:]:
             if players[dying_index].current_health > 0:
                 break
             self.current_health += player.use_reaction_effect(
-                "Brink Of Death", 1, None, dying_index, reacting_player_index)
-            reacting_player_index += 1
-            if reacting_player_index >= len(players):
-                reacting_player_index -= len(players)
+                "Brink Of Death", 1, None, dying_index, reacting_index)
+            reacting_index += 1
+            if reacting_index >= len(players):
+                reacting_index -= len(players)
         for player in players[:dying_index]:
             if players[dying_index].current_health > 0:
                 break
             self.current_health += player.use_reaction_effect(
-                "Brink Of Death", 1, None, dying_index, reacting_player_index)
-            reacting_player_index += 1
-            if reacting_player_index >= len(players):
-                reacting_player_index -= len(players)
+                "Brink Of Death", 1, None, dying_index, reacting_index)
+            reacting_index += 1
+            if reacting_index >= len(players):
+                reacting_index -= len(players)
 
             # If player died
             if self.current_health < 1:
@@ -534,7 +736,6 @@ class Player:
     def check_pending_judgements(self):
         while len(self.pending_judgements) > 0:
             print(" ")
-            main_deck.check_if_empty()
             pending_judgement = self.pending_judgements.pop(0)
 
             # LIGHTNING
@@ -622,16 +823,18 @@ class Player:
         self.tools_immunity = False
 
     # Equipment Checks
-    def armor_black_shield(self, attack_card):
+    def armor_black_shield(self, card):
+        # 'card' refers to the ATTACK card used against the defending-player
+
         for item_index, item in enumerate(self.equipment):
             if item.effect == "Black Shield":
                 bs_index = item_index
                 black_shield = True
 
         if black_shield:
-            if attack_card.suit == "\u2660" or attack_card.suit == "\u2663":
+            if card.suit == "\u2660" or card.suit == "\u2663":
                 print(
-                    f"  >> {self.character} has {self.equipment[bs_index]} equipped, and therefore CANNOT be affected by black attack cards ({attack_card} discarded as normal).")
+                    f"  >> {self.character} has {self.equipment[bs_index]} equipped, and therefore CANNOT be affected by black attack cards ({card} discarded as normal).")
                 return True
         return False
 
@@ -645,7 +848,6 @@ class Player:
             choices = [True, False]
             activated = random.choice(choices)
             if activated:
-                main_deck.check_if_empty()
                 print(
                     f"  >> {self.character} chose to activate their equipped {self.equipment[et_index]} (armor); needs \u2665 or \u2666 to automatically dodge.")
                 main_deck.discard_from_deck()
@@ -671,7 +873,7 @@ class Player:
                     f"  >> {self.character} has {self.equipment[item_index]} equipped, and therefore has no limit to the amount of attacks per turn.")
                 return True
 
-    # Game-Phase
+    # Game-Phases
     def start_beginning_phase(self):
         print(" ")
         self.reset_once_per_turn()
@@ -682,8 +884,6 @@ class Player:
         print(" ")
         if self.check_pending_judgements() == "Break":
             return "Break"
-        elif self.acedia_active:
-            return self.start_discard_phase()
         else:
             return self.start_drawing_phase()
 
@@ -728,7 +928,7 @@ discard_deck = Deck([])
 main_deck.shuffle()
 print("The deck has been shuffled!")
 for player in players:
-    player.draw(main_deck, 4)
+    player.draw(main_deck, 4, False)
 print("All players have been dealt 4 cards!")
 game_started = True
 
