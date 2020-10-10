@@ -7,29 +7,20 @@
 /________// /_//|_||/_//  |___// /________// /________// /________//  /________// /_//  /_// /_//| || /_//
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
-Current Version: 10/10/2020
-Version 1.04
+Current Version: 10/10/2020                                                    
+Version 1.05                                                                        
 
- + 10/10/2020 (v1.04);
- - Every method should now be card/player-based, rather than index-based~ (untested)
- - Weapons added: Axe, Frost Blade, Green-Dragon Halberd, Huang's Longbow
- - Implemented: Player.activate_attack()
- - Temporary, but char_names and genders implemented for v1.xx to give purpose to Gender-Swords (and later usage)
+ + 10/10/2020 (v1.05);
+ - Weapons implemented: Gender-Swords, Serpent Spear
+ - Card-effect implemented Player.activate_coerce()
+ - Finished Player.use_reaction_effect()...!
 
  TO DO:
- - 2 weapons remaining: Gender-Swords, Serpent Spear
- - Player.activate_coerce()
- - Player.use_reaction_effect()
  - Greedy Player Mode
+ - Player.activate_coerce() needs fixing...
+ - Bugs with random objects appearing in hands needs fixing...
 """
 import random
-
-
-char_names = ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"]
-genders = ["Male", "Male", "Male", "Male", "Male",
-           "Female", "Female", "Female", "Female", "Female"]
-random.shuffle(genders)
-players = generate_players(6)
 
 
 # --- Game-Setup
@@ -41,7 +32,7 @@ def generate_players(num):
 
 
 def char_names_from_list(char_names):
-    return char_names.pop()
+    return char_names.pop(0)
 
 
 def genders_from_list(genders):
@@ -79,11 +70,9 @@ def check_negate_loop(given_list, card, cplayer, reacting, og_card=None):
                         given_list[:(player_index2 + x)]
                     return check_negate_loop(given_list, card, cplayer, reacting)
             else:
-                print("--------------------------------------------------")
                 print(f"{card} was negated!")
                 return True
     else:
-        print("--------------------------------------------------")
         print(f"{card} was activated!")
         return False
 
@@ -103,9 +92,9 @@ def check_aoe_negate_loop(given_list, card, cplayer, reacting, og_card=None):
             given_list = given_list[(player_index + x):] + \
                 given_list[:(player_index + x)]
             if not check_negate_loop(given_list, response1[1], players[(player_index + x)], response1[2], card):
-                players[response1[2]].tools_immunity = True
+                response1[2].tools_immunity = True
                 print(
-                    f"{players[response1[2]].character} will be unaffected by {og_card}!")
+                    f"{response1[2].character} will be unaffected by {og_card}!")
 
 
 # --- A class for handling playing-cards used in-game
@@ -121,8 +110,9 @@ def check_aoe_negate_loop(given_list, card, cplayer, reacting, og_card=None):
 # 5d. 'Equipment cards': WEAPON (x10), ARMOR (x3), -1 HORSE (x3), +1 HORSE (x3)
 # 6. 'Flavour_text' refers to the description of what the individual card does (for more details, search for all_cards)
 # 7. 'Weapon_range' refers to the range provided by the ten possible weapon-cards (within equipment cards)
+# 8. 'Effect2' refers to the effect that the card will perform (typically after being modified by a character/weapon ability)
 class Card:
-    def __init__(self, rank, val, suit, ctype, effect, flavour_text, weapon_range=None):
+    def __init__(self, rank, val, suit, ctype, effect, flavour_text, weapon_range=None, effect2=None):
         self.rank = rank
         self.val = val
         self.suit = suit
@@ -130,6 +120,7 @@ class Card:
         self.effect = effect
         self.flavour_text = flavour_text
         self.weapon_range = weapon_range
+        self.effect2 = effect2
 
     def __str__(self):
         if self.ctype == "Weapon":
@@ -425,11 +416,12 @@ class Player:
         self.pending_judgements = []
         self.acedia_active = False
         self.tools_immunity = False
+        self.used_trigrams = False
 
     def __str__(self):
         equips = "Equipment: "
         pending = "Pending: "
-        character_details = f" BLANK // {self.current_health}/{self.max_health} HP remaining // "
+        character_details = f" {self.character} // {self.current_health}/{self.max_health} HP remaining // "
         for item in self.equipment:
             if item.ctype == "Weapon":
                 equips += (f"W:{item} // ")
@@ -456,7 +448,7 @@ class Player:
             return (character_details)
 
     # Draw/Discard Methods
-    def draw(self, deck=main_deck, num=1, message=True):
+    def draw(self, deck, num=1, message=True):
         # 'deck' refers to which pile the cards are drawn from (eg. main_deck, discard_deck)
         # 'num' refers to how many cards are being drawn
         # 'message' refers to whether the game announces how many cards are being drawn
@@ -519,11 +511,81 @@ class Player:
 
     # Using Cards/Effects
     def use_card_effect(self, card, card2=None):
-        # card.ctype == 'Basic':
-        if card.effect2 == "Attack":
+        # "Special Attack types":
+        if card.effect2 == "Black Attack":
             if (self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow()):
                 targets = self.calculate_targets_in_weapon_range()
-                if targets < 1:
+                if len(targets) < 1:
+                    print(f"{self.character}: You can't reach anyone with {card}!")
+                    return False
+                else:
+                    target = players[random.choice(targets)]
+                    self.attacks_this_turn += 1
+                    if (card not in discard_deck.contents) and (card in self.hand.contents):
+                        self.hand.contents.remove(card)
+                        discard_deck.add_to_top(card)
+                    if (card2 != None) and (card not in discard_deck.contents) and (card in self.hand.contents):
+                        self.hand.contents.remove(card2)
+                        discard_deck.add_to_top(card2)
+                    print(
+                        f"{self.character} has played a BLACK ATTACK against {target.character}.")
+                    self.activate_attack(card, target, card2)
+                    return True
+            else:
+                print(
+                    f"{self.character}: You can only play one ATTACK card per turn.")
+
+        elif card.effect2 == "Red Attack":
+            if (self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow()):
+                targets = self.calculate_targets_in_weapon_range()
+                if len(targets) < 1:
+                    print(f"{self.character}: You can't reach anyone with {card}!")
+                    return False
+                else:
+                    target = players[random.choice(targets)]
+                    self.attacks_this_turn += 1
+                    if (card not in discard_deck.contents) and (card in self.hand.contents):
+                        self.hand.contents.remove(card)
+                        discard_deck.add_to_top(card)
+                    if (card2 != None) and (card not in discard_deck.contents) and (card in self.hand.contents):
+                        self.hand.contents.remove(card2)
+                        discard_deck.add_to_top(card2)
+                    print(
+                        f"{self.character} has played a RED ATTACK against {target.character}.")
+                    self.activate_attack(card, target, card2)
+                    return True
+            else:
+                print(
+                    f"{self.character}: You can only play one ATTACK card per turn.")
+
+        elif card.effect2 == "Colourless Attack":
+            if (self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow()):
+                targets = self.calculate_targets_in_weapon_range()
+                if len(targets) < 1:
+                    print(f"{self.character}: You can't reach anyone with {card}!")
+                    return False
+                else:
+                    target = players[random.choice(targets)]
+                    self.attacks_this_turn += 1
+                    if (card not in discard_deck.contents) and (card in self.hand.contents):
+                        self.hand.contents.remove(card)
+                        discard_deck.add_to_top(card)
+                    if (card2 != None) and (card not in discard_deck.contents) and (card in self.hand.contents):
+                        self.hand.contents.remove(card2)
+                        discard_deck.add_to_top(card2)
+                    print(
+                        f"{self.character} has played a COLOURLESS ATTACK against {target.character}.")
+                    self.activate_attack(card, target)
+                    return True
+            else:
+                print(
+                    f"{self.character}: You can only play one ATTACK card per turn.")
+
+        # card.ctype == 'Basic':
+        elif card.effect2 == "Attack":
+            if (self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow()):
+                targets = self.calculate_targets_in_weapon_range()
+                if len(targets) < 1:
                     print(f"{self.character}: You can't reach anyone with {card}!")
                     return False
                 else:
@@ -535,15 +597,15 @@ class Player:
                         f"{self.character} has played {card} against {target.character}.")
                     extra_targets = self.check_weapon_sky_scorcher_halberd(
                         target)
-                    if (extra_targets == None) or (extra_targets[0] == 0):
-                        self.activate_attack(card, target, self)
+                    if (extra_targets == 0):
+                        self.activate_attack(card, target)
                     elif (extra_targets[0] == 1):
-                        self.activate_attack(card, target, self)
-                        self.activate_attack(card, extra_targets[1], self)
+                        self.activate_attack(card, target)
+                        self.activate_attack(card, extra_targets[1])
                     elif (extra_targets[0] == 2):
-                        self.activate_attack(card, target, self)
-                        self.activate_attack(card, extra_targets[1], self)
-                        self.activate_attack(card, extra_targets[2], self)
+                        self.activate_attack(card, target)
+                        self.activate_attack(card, extra_targets[1])
+                        self.activate_attack(card, extra_targets[2])
                     return True
             else:
                 print(
@@ -606,7 +668,7 @@ class Player:
                 if not player.tools_immunity:
                     drawn = random.choice(granary.hand.contents)
                     granary.hand.contents.remove(drawn)
-                    player.draw(drawn)
+                    player.hand.add_to_top(drawn)
                     print(f"{player.character} has taken {drawn} via GRANARY!")
 
             for item in granary.hand.contents:
@@ -658,8 +720,10 @@ class Player:
         elif card.effect2 == "Coerce":
             possible_targets = 0
             for player in players[1:]:
-                if len(player.equipment_weapon) > 0:
-                    possible_targets += 1
+                if len(player.equipment) > 0:
+                    for item in player.equipment:
+                        if item.ctype == "Weapon":
+                            possible_targets += 1
 
             if possible_targets == 0:
                 print(
@@ -673,7 +737,7 @@ class Player:
                         if item.ctype == "Weapon":
                             targets.append(player)
 
-                coerced = players[random.choice(targets)]
+                coerced = random.choice(targets)
                 targets = coerced.calculate_targets_in_weapon_range()
                 if len(targets) < 1:
                     return False
@@ -682,7 +746,7 @@ class Player:
                     discard_deck.add_to_top(card)
                     attacked = players[random.choice(targets)]
                     if not check_negate_loop(players, card, self, coerced):
-                        coerced.activate_coerce(card, attacked)
+                        coerced.activate_coerce(attacked)
 
         elif card.effect2 == "Dismantle":
             target = random.choice(players[1:])
@@ -721,7 +785,7 @@ class Player:
 
         elif card.effect2 == "Steal":
             targets = self.calculate_targets_in_physical_range()
-            if targets < 1:
+            if len(targets) < 1:
                 print(f"{self.character}: You can't reach anyone with {card}!")
                 return False
             target = players[random.choice(targets)]
@@ -771,7 +835,7 @@ class Player:
         elif card.ctype == "Weapon":
             weapon_index = None
             for item_index, item in enumerate(self.equipment):
-                if item.type == "Weapon":
+                if item.ctype == "Weapon":
                     weapon_index = item_index
                     break
 
@@ -784,7 +848,7 @@ class Player:
         elif card.ctype == "Armor":
             armor_index = None
             for item_index, item in enumerate(self.equipment):
-                if item.type == "Armor":
+                if item.ctype == "Armor":
                     armor_index = item_index
                     break
 
@@ -797,7 +861,7 @@ class Player:
         elif card.ctype == "-1 Horse":
             horse_index = None
             for item_index, item in enumerate(self.equipment):
-                if item.type == "-1 Horse":
+                if item.ctype == "-1 Horse":
                     horse_index = item_index
                     break
 
@@ -810,7 +874,7 @@ class Player:
         elif card.ctype == "+1 Horse":
             horse_index = None
             for item_index, item in enumerate(self.equipment):
-                if item.type == "+1 Horse":
+                if item.ctype == "+1 Horse":
                     horse_index = item_index
                     break
 
@@ -820,8 +884,287 @@ class Player:
             self.equipment.append(card)
             print(f"{self.character} has equipped {card}.")
 
-    def use_reaction_effect(self):
-        pass
+    def use_reaction_effect(self, response_required, required, card, cplayer, rplayer, other_effect=None, other_card=None):
+        # 'response_required' refers to what sort of reaction-effect needed, eg. ATTACK, DEFEND, PEACH, NEGATE?
+        # 'required' refers to the amount of each card required. This is a placeholder for certain character effects (Lu Bu / Dong Zhuo)
+        # 'card' refers to the card played that is being 'reacted' against
+        # 'cplayer' refers to the person who played the 'card'
+        # 'rplayer' refers to the person affected by the 'card'
+        # 'other_effect' refers to any specific abilities that cause this effect (usually done by character/weapon-abilities)
+        # 'other_card' refers to the original card used, typically required in reactions to reactions to reactions etc...
+        output_value = 0
+        for item in self.hand.contents:
+            item.effect2 = None
+        reactions_possible = True
+        while reactions_possible:
+            if response_required == "Brink Of Death":
+                possible_cards = 0
+                for item in self.hand.contents:
+                    if item.effect == "Peach":
+                        possible_cards += 1
+                if possible_cards > 0:
+                    choices = [True, False]
+                    activated = random.choice(choices)
+                    if activated:
+                        peach_required = True
+                        while peach_required:
+                            peach = self.discard()
+                            if (peach.effect == "Peach") or (peach.effect2 == "Peach"):
+                                output_value += 1
+                                peach_required = False
+                            else:
+                                discard_deck.contents.remove(peach)
+                                self.hand.add_to_top(peach)
+                        if self == cplayer:
+                            print(
+                                f"{self.character} has healed themselves using a {peach}! ({self.current_health + output_value}/{self.max_health} HP remaining!)")
+                        else:
+                            print(
+                                f"{self.character} has healed {cplayer.character} using a {peach}. ({cplayer.current_health + output_value}/{cplayer.max_health} HP remaining!)")
+                            if cplayer.check_break_brink_loop(output_value):
+                                return output_value
+
+                return output_value
+
+            elif response_required == "Negate":
+                possible_cards = 0
+                for item in self.hand.contents:
+                    if item.effect == "Negate":
+                        possible_cards += 1
+                if possible_cards < 1:
+                    return [False, None]
+
+                else:
+                    if card.ctype == "Delay-Tool":
+                        print(
+                            f"{self.character}: {rplayer.character} is about to face judgement for {card} - Do you want to respond with a NEGATE?")
+                    elif card.effect2 == "Greed":
+                        print(
+                            f"{self.character}: {cplayer.character} has played {card} - Do you want to respond with a NEGATE?")
+                    elif other_card != None:
+                        if other_card.ctype == "Delay-Tool":
+                            print(
+                                f"{self.character}: {cplayer.character} has played a {card} against pending judgement: {other_card} on {rplayer.character} - Do you want to respond?")
+                        else:
+                            print(
+                                f"{self.character}: {cplayer.character} has played a {card} against the {other_card} of {rplayer.character} - Do you want to respond?")
+                    else:
+                        print(
+                            f"{self.character}: {cplayer.character} has played a {card} against {rplayer.character} - Do you want to respond?")
+
+                    choices = [True, False]
+                    activated = random.choice(choices)
+                    if activated:
+                        negate_required = True
+                        while negate_required:
+                            negate = self.discard()
+                            if negate.effect == "Negate":
+                                output_value += 1
+                                negate_required = False
+                            else:
+                                discard_deck.contents.remove(negate)
+                                self.hand.add_to_top(negate)
+                        [True, negate]
+
+                return [False, None]
+
+            elif response_required == "AoE Negate":
+                possible_cards = 0
+                for item in self.hand.contents:
+                    if item.effect == "Negate":
+                        possible_cards += 1
+                if possible_cards < 1:
+                    return [False, None]
+                else:
+
+                    print(
+                        f"{self.character}: {cplayer.character} has played a {card}. Do you want to respond by negating it for ANY player?")
+                    choices = [True, False]
+                    activated = random.choice(choices)
+                    if activated:
+                        targets = []
+                        for player in players:
+                            if (card.effect2 == "Barbarians" or card.effect2 == "Rain of Arrows") and (player != players[0]):
+                                targets.append(player)
+                            elif (card.effect2 == "Granary"):
+                                targets.append(player)
+                            elif (card.effect2 == "Peach Gardens") and (player.max_health > player.current_health):
+                                targets.append(player)
+                        negated_for = random.choice(targets)
+                        negate_required = True
+                        while negate_required:
+                            negate = self.discard()
+                            if negate.effect == "Negate":
+                                output_value += 1
+                                negate_required = False
+                            else:
+                                discard_deck.contents.remove(negate)
+                                self.hand.add_to_top(negate)
+                        return [True, negate, negated_for]
+                return [False, None]
+
+            elif response_required == "Defend" and ((card.effect2 == "Attack") or (card.effect2 == "Black Attack") or (card.effect2 == "Red Attack") or (card.effect2 == "Colourless Attack")):
+                if card.effect2 == "Attack":
+                    print(
+                        f"{self.character}: You are being attacked by {cplayer.character} using {card}; please choose a response (a DEFEND card or do nothing)!")
+                else:
+                    print(
+                        f"{self.character}: You are being attacked by {cplayer.character} using a {card.effect2.upper()}; please choose a response (a DEFEND card or do nothing)!")
+
+                defend = 0
+                while required > 0:
+                    if not cplayer.check_weapon_black_pommel():
+                        armor_check = self.check_armor_eight_trigrams()
+                        if not self.used_trigrams:
+                            self.used_trigrams = True
+                            if armor_check[0]:
+                                self.used_trigrams = False
+                                required -= 1
+                                defend = armor_check[1]
+                                if required == 0:
+                                    return defend
+
+                    possible_cards = 0
+                    for item in self.hand.contents:
+                        if item.effect == "Defend":
+                            possible_cards += 1
+
+                    if possible_cards == 0:
+                        return defend
+
+                    elif possible_cards > 0:
+                        choices = [True, False]
+                        activated = random.choice(choices)
+                        if activated:
+                            defend_required = True
+                            while defend_required:
+                                defend = self.discard()
+                                if defend.effect == "Defend":
+                                    self.used_trigrams = False
+                                    defend_required = False
+                                    required -= 1
+                                else:
+                                    discard_deck.contents.remove(defend)
+                                    self.hand.add_to_top(defend)
+                return defend
+
+            elif response_required == "Attack" and card.effect2 == "Barbarians":
+                print(
+                    f"{self.character}: {cplayer.character} has activated BARBARIANS; please choose a response (an ATTACK card or do nothing)!")
+
+                attack = 0
+                possible_cards = 0
+                for item in self.hand.contents:
+                    if item.effect == "Attack":
+                        possible_cards += 1
+
+                weapon = False
+                total_cards = self.hand.contents
+                if len(total_cards) > 1:
+                    for item in self.equipment:
+                        if item.effect == "Serpent Spear":
+                            weapon = True
+                            break
+                if weapon:
+                    serp_spear = self.check_weapon_serpent_spear()
+                    if serp_spear[0]:
+                        attack = serp_spear[1]
+                        return attack
+
+                if possible_cards > 0:
+                    choices = [True, False]
+                    activated = random.choice(choices)
+                    if activated:
+                        attack_required = True
+                        while attack_required:
+                            attack = self.discard()
+                            if attack.effect == "Attack":
+                                attack_required = False
+                            else:
+                                discard_deck.contents.remove(attack)
+                                self.hand.add_to_top(attack)
+                return attack
+
+            elif response_required == "Defend" and card.effect2 == "Rain of Arrows":
+                print(f"{self.character}: {cplayer.character} has activated RAIN OF ARROWS; please choose a response (a DEFEND card or do nothing)!")
+
+                defend = 0
+                armor_check = self.check_armor_eight_trigrams()
+                if not self.used_trigrams:
+                    self.used_trigrams = True
+                    if armor_check[0]:
+                        self.used_trigrams = False
+                        defend = armor_check[1]
+                        return defend
+
+                possible_cards = 0
+                for item in self.hand.contents:
+                    if item.effect == "Defend":
+                        possible_cards += 1
+
+                if possible_cards > 0:
+                    choices = [True, False]
+                    activated = random.choice(choices)
+                    if activated:
+                        defend_required = True
+                        while defend_required:
+                            defend = self.discard()
+                            if defend.effect == "Defend":
+                                self.used_trigrams = False
+                                defend_required = False
+                                required -= 1
+                            else:
+                                discard_deck.contents.remove(defend)
+                                self.hand.add_to_top(defend)
+                return defend
+
+            elif response_required == "Attack" and card.effect2 == "Duel":
+                print(
+                    f"{self.character}: You having a DUEL vs {rplayer.character}; please choose a response (an ATTACK card or do nothing)!")
+                while required > 0:
+
+                    possible_cards = 0
+                    for item in self.hand.contents:
+                        if item.effect == "Attack":
+                            possible_cards += 1
+
+                    weapon = False
+                    total_cards = self.hand.contents
+                    if len(total_cards) > 1:
+                        for item in self.equipment:
+                            if item.effect == "Serpent Spear":
+                                weapon = True
+                                break
+                    if weapon:
+                        serp_spear = self.check_weapon_serpent_spear()
+                        if serp_spear[0]:
+                            required -= 1
+
+                    elif possible_cards < 1:
+                        return True
+
+                    elif possible_cards > 0:
+                        choices = [True, False]
+                        activated = random.choice(choices)
+                        if activated:
+                            attack_required = True
+                            while attack_required:
+                                attack = self.discard()
+                                if attack.effect == "Attack":
+                                    attack_required = False
+                                    required -= 1
+                                else:
+                                    discard_deck.contents.remove(attack)
+                                    self.hand.add_to_top(attack)
+                        else:
+                            return True
+
+                duel_won = cplayer.use_reaction_effect(
+                    "Attack", 1, card, rplayer, cplayer)
+                if duel_won:
+                    return False
+                else:
+                    return True
 
     def activate_attack(self, card, target, card2=None):
         # 'card' refers to the 'Attack' card used in Player.use_card_effect(card)
@@ -830,10 +1173,11 @@ class Player:
         # 'card2' refers to any secondary 'Attack' cards used; this is used when there are any special effects (such as Serpent Spear)
 
         # Weapon and Black Shield checks
+        self.check_gender_swords(target)
         if (card2 == None) or (card2.effect2 == "Black Attack"):
             if self.check_weapon_black_pommel():
                 pass
-            elif target.check_armor_black_shield(card, self):
+            elif target.check_armor_black_shield(card):
                 return False
 
             # Check for DEFEND
@@ -849,6 +1193,10 @@ class Player:
                     self.check_weapon_axe(target)
                     self.check_weapon_green_dragon_halberd(target)
             else:
+                # DAMAGED - pre-damage abilities
+                if self.check_frost_blade(target):
+                    return "Break"
+
                 # Damage Resolution
                 damage_dealt = 1
                 target.current_health -= damage_dealt
@@ -856,13 +1204,72 @@ class Player:
                 self.check_weapon_huangs_longbow(target)
                 for player in players:
                     if player.current_health < 1:
-                        if player.check_brink_of_death_loop(player, self) == "Break":
+                        if player.check_brink_of_death_loop(self) == "Break":
                             return "Break"
 
-    def activate_coerce(self, card, target):
-        # 'card' refers to the 'Attack' card used in Player.use_card_effect(card)
+    def activate_coerce(self, target):
         # 'target' refers to the player that will potentially be attacked by the coerced player!
-        pass
+        choices = [False]
+        for item in self.hand.contents:
+            if item.effect == "Attack":
+                choices.append(True)
+                break
+
+        weapon = False
+        if len(choices) < 2:
+            total_cards = self.hand.contents
+            if len(total_cards) > 1:
+                for item in self.equipment:
+                    if item.effect == "Serpent Spear":
+                        choices.append(True)
+                        weapon = True
+                        break
+        if weapon:
+            serp_spear = self.check_weapon_serpent_spear()
+            if serp_spear[0]:
+                return self.activate_attack(serp_spear[1], target, serp_spear[2])
+            else:
+                for item in self.equipment:
+                    if item.ctype == "Weapon":
+                        self.equipment.remove(item)
+                        players[0].hand.add_to_top(item)
+                        print(
+                            f"{self.character}: Your weapon has been stolen by {players[0].character} for not attacking {target.character}!")
+                        break
+                return False
+
+        activated = random.choice(choices)
+        if activated:
+            card2 = None
+            attack_pending = True
+            while attack_pending:
+                card = self.discard()
+                if card.effect == "Attack":
+                    attack_pending = False
+                else:
+                    discard_deck.contents.remove(card)
+                    self.hand.add_to_top(card)
+
+            print(
+                f"{self.character} was coerced into attacking {target.character}.")
+            extra_targets = self.check_weapon_sky_scorcher_halberd(target)
+            if (extra_targets == 0):
+                self.activate_attack(card, target, card2)
+            elif (extra_targets[0] == 1):
+                self.activate_attack(card, target)
+                self.activate_attack(card, extra_targets[1])
+            elif (extra_targets[0] == 2):
+                self.activate_attack(card, target)
+                self.activate_attack(card, extra_targets[1])
+                self.activate_attack(card, extra_targets[2])
+        else:
+            for item in self.equipment:
+                if item.ctype == "Weapon":
+                    self.equipment.remove(item)
+                    players[0].hand.add_to_top(item)
+                    print(
+                        f"{self.character}: Your weapon has been stolen by {players[0].character} for not attacking {target.character}!")
+                    break
 
     def activate_dismantle(self, card, target):
         # 'card' refers to the 'Dismantle' card used in Player.use_card_effect(card)
@@ -892,7 +1299,7 @@ class Player:
         # 'card' refers to the 'Duel' card used in Player.use_card_effect(card)
         # 'target' refers to the player targeted by Duel!
         # 'duel_won' is a boolean that determines the winner of the duel
-        duel_won = target.use_reaction_effect("Attack", card, target, self)
+        duel_won = target.use_reaction_effect("Attack", 1, card, target, self)
         damage_dealt = 1
 
         if duel_won:
@@ -943,7 +1350,7 @@ class Player:
         my_index = get_player_index(self)
         output = []
         for item in self.equipment:
-            if item.type == "-1 Horse":
+            if item.ctype == "-1 Horse":
                 modifier += 1
                 break
 
@@ -953,7 +1360,7 @@ class Player:
 
                 target_modifier = 0
                 for item in target.equipment:
-                    if item.type == "+1 Horse":
+                    if item.ctype == "+1 Horse":
                         target_modifier += 1
                         break
 
@@ -970,9 +1377,9 @@ class Player:
         output = []
         weapon_range = 1
         for item in self.equipment:
-            if item.type == "-1 Horse":
+            if item.ctype == "-1 Horse":
                 modifier += 1
-            if item.type == "Weapon":
+            if item.ctype == "Weapon":
                 weapon_range = item.weapon_range
 
         for (target_index, target) in enumerate(players):
@@ -981,7 +1388,7 @@ class Player:
 
                 target_modifier = 0
                 for item in target.equipment:
-                    if item.type == "+1 Horse":
+                    if item.ctype == "+1 Horse":
                         target_modifier += 1
                         break
 
@@ -1043,6 +1450,7 @@ class Player:
 
             # LIGHTNING
             if pending_judgement.effect2 == 'Lightning':
+                move_lightning = False
                 print(
                     f"{self.character} must face judgement for LIGHTNING; (needs anything but TWO to NINE of \u2660 or else they suffer THREE points of lightning damage)! If no hit, LIGHTNING will pass onto the next player!")
                 negated = check_negate_loop(
@@ -1125,38 +1533,44 @@ class Player:
         self.attacks_this_turn = 0
         self.acedia_active = False
         self.tools_immunity = False
+        self.used_trigrams = False
 
     # Equipment Checks
     def check_armor_black_shield(self, card):
         # 'card' refers to the ATTACK card used against the defending-player
+        armor = False
         for item_index, item in enumerate(self.equipment):
             if item.effect == "Black Shield":
-                bs_index = item_index
-                black_shield = True
+                armor_index = item_index
+                armor = True
+                break
 
-        if black_shield:
+        if armor:
             if card.suit == "\u2660" or card.suit == "\u2663":
                 print(
-                    f"  >> {self.character} has {self.equipment[bs_index]} equipped, and therefore CANNOT be affected by black attack cards ({card} discarded as normal).")
+                    f"  >> {self.character} has {self.equipment[armor_index]} equipped, and therefore CANNOT be affected by black attack cards ({card} discarded as normal).")
                 return True
         return False
 
     def check_armor_eight_trigrams(self):
+        armor = False
         for item_index, item in enumerate(self.equipment):
             if item.effect == "Eight-Trigrams":
-                et_index = item_index
-                eight_trigrams = True
+                armor_index = item_index
+                armor = True
+                break
 
-        if eight_trigrams:
+        if armor:
             choices = [True, False]
             activated = random.choice(choices)
             if activated:
                 print(
-                    f"  >> {self.character} chose to activate their equipped {self.equipment[et_index]} (armor); needs \u2665 or \u2666 to automatically dodge.")
+                    f"  >> {self.character} chose to activate their equipped {self.equipment[armor_index]} (armor); needs \u2665 or \u2666 to automatically dodge.")
                 main_deck.discard_from_deck()
                 judgement_card = discard_deck.contents[0]
                 print(f"{self.character} flipped a {judgement_card}.")
                 if judgement_card.suit == "\u2665" or judgement_card.suit == "\u2666":
+                    judgement_card.effect2 = "Defend"
                     return (True, judgement_card)
                 else:
                     return (False, None)
@@ -1164,11 +1578,13 @@ class Player:
 
     def check_weapon_axe(self, target):
         # 'target' refers to the target of the initial ATTACK card.
+        weapon = False
         for item_index, item in enumerate(self.equipment):
             if item.effect == "Axe":
                 total_cards = self.hand.contents + self.equipment
                 if len(total_cards) > 2:
                     weapon = True
+                    break
 
         if weapon:
             choices = [True, False]
@@ -1179,30 +1595,30 @@ class Player:
                     card = self.discard("Handquip")
                     if card.effect == "Axe":
                         discard_deck.contents.remove(card)
-                        self.equipment.append(card)
+                        self.equipment.insert(item_index, card)
                     else:
                         print(
-                            f"{self.character} discarded {card} by using {self.equipment[item_index]}!")
+                            f"{self.character} discarded {card} by using their [Axe <:3:> - 5\u2666].")
                         cards_to_discard -= 1
                 damage_dealt = 1
                 target.current_health -= damage_dealt
                 print(
-                    f"{self.character} has forced the damage to {target.character}, by using {self.equipment[item_index]}, and discarding two cards ({target.current_health}/{target.max_health} HP remaining).")
+                    f"{self.character} has forced the damage to {target.character}, by using their [Axe <:3:> - 5\u2666], and discarding two cards ({target.current_health}/{target.max_health} HP remaining).")
                 for player in players:
                     if player.current_health < 1:
-                        player.check_brink_of_death_loop(player, self)
-
+                        player.check_brink_of_death_loop(self)
                 return True
 
     def check_weapon_black_pommel(self):
         for item_index, item in enumerate(self.equipment):
             if item.effect == "Black Pommel":
                 print(
-                    f"  >> {self.character} has {self.equipment[item_index]} equipped, and therefore ignores any armor when attacking.")
+                    f"{self.character} has {self.equipment[item_index]} equipped, and therefore ignores any armor when attacking.")
                 return True
 
     def check_frost_blade(self, target):
         # 'target' refers to the target of the initial ATTACK card.
+        weapon = False
         for item_index, item in enumerate(self.equipment):
             if item.effect == "Frost Blade":
                 weapon_index = item_index
@@ -1211,13 +1627,13 @@ class Player:
 
         if weapon:
             total_cards = target.hand.contents + target.equipment
-            if total_cards > 0:
+            if len(total_cards) > 0:
                 choices = [True, False]
                 activated = random.choice(choices)
                 if activated:
                     print(
                         f"{self.character} has {self.equipment[weapon_index]} equipped, and chose to make {target.character} discard two cards instead of taking damage.")
-                    if total_cards > 1:
+                    if len(total_cards) > 1:
                         total_cards = 2
                     else:
                         total_cards = 1
@@ -1225,11 +1641,40 @@ class Player:
                         card = target.discard("Handquip")
                         print(
                             f"{self.character} has forced {target.character} to discard {card}!")
+                        total_cards -= 1
                     return True
         return False
 
+    def check_gender_swords(self, target):
+        # 'target' refers to the target of the initial ATTACK card.
+        weapon = False
+        for item_index, item in enumerate(self.equipment):
+            if item.effect == "Gender-Swords":
+                weapon_index = item_index
+                weapon = True
+                break
+
+        if weapon:
+            if self.gender != target.gender:
+                if len(target.hand.contents) > 0:
+                    choices = ["Draw", "Discard"]
+                    choice = random.choice(choices)
+                    if choice == "Draw":
+                        self.draw(main_deck, 1, False)
+                        print(
+                            f"{self.character} draws a card after attacking with {self.equipment[weapon_index]}.")
+                    if choice == "Discard":
+                        card = target.discard()
+                        print(
+                            f"{target.character} discards {card} after being attacked by {self.equipment[weapon_index]}.")
+                else:
+                    self.draw(main_deck, 1, False)
+                    print(
+                        f"{self.character} draws a card after attacking with {self.equipment[weapon_index]}.")
+
     def check_weapon_green_dragon_halberd(self, target):
         # 'target' refers to the target of the initial ATTACK card.
+        weapon = False
         for item_index, item in enumerate(self.equipment):
             if item.effect == "Green Dragon Halberd":
                 weapon_index = item_index
@@ -1238,7 +1683,7 @@ class Player:
 
         if weapon:
             total_cards = self.hand.contents + self.equipment
-            if total_cards > 0:
+            if len(total_cards) > 0:
                 choices = [True, False]
                 activated = random.choice(choices)
                 if activated:
@@ -1246,15 +1691,17 @@ class Player:
                         0, 'NONE', 'NONE', 'Tool', 'Barbarians', 'NONE', None)
                     placeholder.effect2 = "Barbarians"
                     card = player.use_reaction_effect(
-                        "Attack", 1, placeholder, self, target)
+                        "Attack", 1, placeholder, self, target, "Green Dragon Halberd")
                     if type(card) == Card:
                         if (card.effect == "Attack") or (card.effect2 == "Attack"):
                             print(
                                 f"{self.character} attacked again with {card}, using {self.equipment[weapon_index]}!")
                             self.activate_attack(card, target)
+                            return True
 
     def check_weapon_huangs_longbow(self, target):
         # 'target' refers to the target of the initial ATTACK card.
+        weapon = False
         for item_index, item in enumerate(self.equipment):
             if item.effect == "Huang's Longbow":
                 weapon_index = item_index
@@ -1276,11 +1723,40 @@ class Player:
                     target.equipment.remove(horse_slain)
                     discard_deck.add_to_top(horse_slain)
                     print(
-                        f"  >> {self.character} has {self.equipment[weapon_index]} equipped, and therefore slays {horse_slain} of {target.character}!")
+                        f"{self.character} has {self.equipment[weapon_index]} equipped, and therefore slays {horse_slain} of {target.character}!")
                     return True
+
+    def check_weapon_serpent_spear(self):
+        weapon = False
+        for item_index, item in enumerate(self.equipment):
+            if item.effect == "Serpent Spear":
+                weapon_index = item_index
+                weapon = True
+                break
+
+        if weapon and (len(self.hand.contents) > 1):
+            choices = [True, False]
+            activated = random.choice(choices)
+            if activated:
+                card = self.discard()
+                card2 = self.discard()
+                if (card.suit == "\u2660" or card.suit == "\u2663") and (card2.suit == "\u2660" or card2.suit == "\u2663"):
+                    card.effect2 = "Black Attack"
+                    card2.effect2 = "Black Attack"
+                elif (card.suit == "\u2665" or card.suit == "\u2666") and (card2.suit == "\u2665" or card2.suit == "\u2666"):
+                    card.effect2 = "Red Attack"
+                    card2.effect2 = "Red Attack"
+                else:
+                    card.effect2 = "Colourless Attack"
+                    card.effect2 = "Colourless Attack"
+                print(
+                    f"{self.character} discarded two cards ({card}/{card2} to use as an ATTACK via {self.equipment[weapon_index]}!")
+                return [True, card, card2]
+        return [False]
 
     def check_weapon_sky_scorcher_halberd(self, target):
         # 'target' refers to the target of the initial ATTACK card. They cannot be hit again via this weapon's effect!
+        weapon = False
         if len(self.hand.contents) == 0:
             for item_index, item in enumerate(self.equipment):
                 if item.effect == "Sky Scorcher Halberd":
@@ -1290,23 +1766,23 @@ class Player:
 
         if weapon:
             print(
-                f"  >> {self.character} has used their last hand-card to ATTACK {target.character} with {self.equipment[weapon_index]}. They can target up to two extra players!")
+                f"{self.character} has used their last hand-card to ATTACK {target.character} with {self.equipment[weapon_index]}. They can target up to two extra players!")
             target_index1 = get_player_index(target)
             targets = self.calculate_targets_in_weapon_range()
             targets.remove(target_index1)
-            if targets < 1:
+            if len(targets) < 1:
                 print(
                     f"{self.character}: You can't reach anyone else with your ATTACK!")
-                return None
+                return 0
 
             else:
                 targets.append("No more!")
                 target_index2 = random.choice(targets)
                 if target_index2 == "No more!":
-                    return None
+                    return 0
                 target2 = players[target_index2]
                 targets.remove(target_index2)
-                if targets < 1:
+                if len(targets) < 1:
                     print(
                         f"{self.character}: You can't reach anyone else with your ATTACK!")
                     return [True, target2]
@@ -1317,30 +1793,29 @@ class Player:
                         return [True, target2]
                     target3 = players[target_index3]
                     return [True, target2, target3]
+        return 0
 
     def check_weapon_zhuge_crossbow(self):
         for item_index, item in enumerate(self.equipment):
             if item.effect == "Zhuge Crossbow":
                 print(
-                    f"  >> {self.character} has {self.equipment[item_index]} equipped, and therefore has no limit to the amount of attacks per turn.")
+                    f"{self.character} has {self.equipment[item_index]} equipped, and therefore has no limit to the amount of attacks per turn.")
                 return True
 
     # Game-Phases
     def start_beginning_phase(self):
-        print(" ")
         self.reset_once_per_turn()
+        print(" ")
         print(f"{self.character} has started their turn!")
         return self.start_judgement_phase()
 
     def start_judgement_phase(self):
-        print(" ")
         if self.check_pending_judgements() == "Break":
             return "Break"
         else:
             return self.start_drawing_phase()
 
     def start_drawing_phase(self):
-        print(" ")
         cards_drawn = 2
         self.draw(main_deck, cards_drawn)
         if self.acedia_active:
@@ -1351,16 +1826,36 @@ class Player:
     def start_action_phase(self):
         action_phase_active = True
         while action_phase_active:
+            print(" ")
+            if len(players) == 1:
+                return self.start_end_phase()
             actions = self.hand.contents + ["End Action-Phase"]
+
+            # Serpent Spear Check
+            serp_spear = None
+            total_cards = self.hand.contents
+            if len(total_cards) > 1:
+                for serp_spear in self.equipment:
+                    if serp_spear.effect == "Serpent Spear":
+                        actions.append(serp_spear)
+                        break
+
             card = random.choice(actions)
-            if card != "End Action-Phase":
-                card.effect2 = card.effect
-                self.use_card_effect(card)
-            else:
+            print(f"Options: {actions}")
+            print(f"Selected: {card}")
+
+            if card == "End Action-Phase":
                 return self.start_discard_phase()
 
+            if card == serp_spear:
+                serp_spear = self.check_weapon_serpent_spear()
+                if serp_spear[0]:
+                    self.use_card_effect(serp_spear[1], serp_spear[2])
+            else:
+                card.effect2 = card.effect
+                self.use_card_effect(card)
+
     def start_discard_phase(self):
-        print(" ")
         difference = 0
         # Discard down to your current health level
         if len(self.hand.contents) > self.current_health:
@@ -1369,12 +1864,17 @@ class Player:
         return self.start_end_phase()
 
     def start_end_phase(self):
-        print(" ")
+        print(f"{self.character} has ended their turn!")
 
 
 # GAME-STATE
 # GAME-STATE
 # GAME-STATE
+char_names = ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"]
+genders = ["Male", "Male", "Male", "Male", "Male",
+           "Female", "Female", "Female", "Female", "Female"]
+random.shuffle(genders)
+players = generate_players(6)
 main_deck = Deck(all_cards)
 discard_deck = Deck([])
 main_deck.shuffle()
@@ -1385,10 +1885,15 @@ print("All players have been dealt 4 cards!")
 game_started = True
 
 while game_started:
-    players[0].start_beginning_phase()
-    # If alive at end of turn
-    if players[0].current_health > 0:
-        players.append(players.pop(0))
+    # If one player remaining...
+    if len(players) == 1:
+        game_started = False
+        print(f"{players[0]} has won the game!!!")
     else:
-        # If dead at end of turn
-        players.pop(0)
+        players[0].start_beginning_phase()
+        # If alive at end of turn
+        if players[0].current_health > 0:
+            players.append(players.pop(0))
+        else:
+            # If dead at end of turn
+            players.pop(0)
