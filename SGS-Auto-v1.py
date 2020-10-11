@@ -8,21 +8,17 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 11/10/2020
-Version 1.06
+Version 1.07
 
- + 10/10/2020 (v1.06);
- - Reduced while-loops within while-loops
- - Cards no longer brute-force till one is correct, instead they are all placed in a variable called possible_cards where one is selected at random
- - Revamped play_reaction_effect and various weapons to be cleaner and more efficient code 
- - Fixed an error where AoE negate tries to negate when there are no targets to negate for
- - Fixed a bug where lightning fails to return when it can't pass to another player
- - Fixed a bug with lightning_passed referenced before assignment in Player.check_pending_judgements()
- - Fixed a bug where granary was creating "Hand objects" and placing them into the main_deck
- - Created sub-functions for generate_players, to generate new lists of char_names and genders (for eventual repetition)
+ + 11/10/2020 (v1.07);
+ - Fixed bug when targeting player with ONLY a negate in-hand (used) // secondary check added to activate_dismantle()/activate_steal()
+ - Fixed bug with DUEL displaying wrong player-names
+ - Added print-statements to DUEL
+ - Reduced unnecessary Black Pommel statements, by only applying when Black-Shield is also equipped and weapon effect then applies
+ - Added print('---') between player turns ending and starting!
 
  TO DO:
- - Greedy Player Mode
- - Bugs with random objects appearing in hands needs fixing...(?) - Might be addressed!
+ - Greedy Player Mode  
 """
 import random
 
@@ -41,6 +37,10 @@ def generate_genders():
 
 def generate_players(num):
     # 'num' refers to the number of players you want to generate
+    if num > 10:
+        num = 10
+    if 3 > num:
+        num = 3
     char_names = generate_char_names()
     genders = generate_genders()
     players = [Player(char_names_from_list(char_names), genders_from_list(genders))
@@ -1129,6 +1129,8 @@ class Player:
                             attack = random.choice(possible_cards)
                             self.hand.contents.remove(attack)
                             discard_deck.add_to_top(attack)
+                            print(
+                                f"{self.character} played an {attack} during the duel!")
                             required -= 1
                         else:
                             return True
@@ -1152,7 +1154,7 @@ class Player:
         # Weapon and Black Shield checks
         self.check_gender_swords(target)
         if (card2 == None) or (card2.effect2 == "Black Attack"):
-            if self.check_weapon_black_pommel():
+            if target.check_armor_black_shield(card) and self.check_weapon_black_pommel():
                 pass
             elif target.check_armor_black_shield(card):
                 return False
@@ -1238,24 +1240,25 @@ class Player:
         # 'target' refers to the player targeted by Dismantle!
         # 'dismantled' refers to the card targeted by Dismantle!
         total_cards = target.hand.contents + target.equipment + target.pending_judgements
-        dismantled = random.choice(total_cards)
-        if dismantled in target.pending_judgements:
-            target.pending_judgements.remove(dismantled)
-            discard_deck.add_to_top(dismantled)
-            print(
-                f"{self.character} dismantled {dismantled} from the pending judgements of {target.character}!")
+        if len(total_cards) > 0:
+            dismantled = random.choice(total_cards)
+            if dismantled in target.pending_judgements:
+                target.pending_judgements.remove(dismantled)
+                discard_deck.add_to_top(dismantled)
+                print(
+                    f"{self.character} dismantled {dismantled} from the pending judgements of {target.character}!")
 
-        elif dismantled in target.equipment:
-            target.equipment.remove(dismantled)
-            discard_deck.add_to_top(dismantled)
-            print(
-                f"{self.character} dismantled {dismantled} from the equipment of {target.character}!")
+            elif dismantled in target.equipment:
+                target.equipment.remove(dismantled)
+                discard_deck.add_to_top(dismantled)
+                print(
+                    f"{self.character} dismantled {dismantled} from the equipment of {target.character}!")
 
-        elif dismantled in target.hand.contents:
-            target.hand.contents.remove(dismantled)
-            discard_deck.add_to_top(dismantled)
-            print(
-                f"{self.character} dismantled {dismantled} from the hand of {target.character}!")
+            elif dismantled in target.hand.contents:
+                target.hand.contents.remove(dismantled)
+                discard_deck.add_to_top(dismantled)
+                print(
+                    f"{self.character} dismantled {dismantled} from the hand of {target.character}!")
 
     def activate_duel(self, card, target):
         # 'card' refers to the 'Duel' card used in Player.use_card_effect(card)
@@ -1287,24 +1290,25 @@ class Player:
         # 'target' refers to the player targeted by Steal!
         # 'stolen' refers to the card targeted by Steal!
         total_cards = target.hand.contents + target.equipment + target.pending_judgements
-        stolen = random.choice(total_cards)
-        if stolen in target.pending_judgements:
-            target.pending_judgements.remove(stolen)
-            self.hand.add_to_top(stolen)
-            print(
-                f"{self.character} stole {stolen} from the pending judgements of {target.character}!")
+        if len(total_cards) > 0:
+            stolen = random.choice(total_cards)
+            if stolen in target.pending_judgements:
+                target.pending_judgements.remove(stolen)
+                self.hand.add_to_top(stolen)
+                print(
+                    f"{self.character} stole {stolen} from the pending judgements of {target.character}!")
 
-        elif stolen in target.equipment:
-            target.equipment.remove(stolen)
-            self.hand.add_to_top(stolen)
-            print(
-                f"{self.character} stole {stolen} from the equipment of {target.character}!")
+            elif stolen in target.equipment:
+                target.equipment.remove(stolen)
+                self.hand.add_to_top(stolen)
+                print(
+                    f"{self.character} stole {stolen} from the equipment of {target.character}!")
 
-        elif stolen in target.hand.contents:
-            target.hand.contents.remove(stolen)
-            self.hand.add_to_top(stolen)
-            print(
-                f"{self.character} stole {stolen} from the hand of {target.character}!")
+            elif stolen in target.hand.contents:
+                target.hand.contents.remove(stolen)
+                self.hand.add_to_top(stolen)
+                print(
+                    f"{self.character} stole {stolen} from the hand of {target.character}!")
 
     # In-game General Checks
     def calculate_targets_in_physical_range(self, modifier=0):
@@ -1371,7 +1375,7 @@ class Player:
     def check_brink_of_death_loop(self, source):
         # 'source' refers to the player that is considered the source of the damage - this is relevant for attributing bounties/punishments for kills!
         if (self.max_health != 0) and (self.current_health < 1):
-            print(f"{self.character} - You are on the brink of death ({self.current_health}/{self.max_health} health), and you must be brought back to life with a PEACH or WINE.")
+            print(f"{self.character}: You are on the brink of death ({self.current_health}/{self.max_health} health), and you must be brought back to life with a PEACH or WINE.")
             dying_index = get_player_index(self)
             reacting_index = dying_index
 
@@ -1422,12 +1426,12 @@ class Player:
                 if not negated:
                     main_deck.discard_from_deck()
                     judgement_card = discard_deck.contents[0]
-                    print(f"{self.character} flipped a {judgement_card}.")
+                    print(f"  >> {self.character} flipped a {judgement_card}.")
 
                     # IF JUDGEMENT OCCURS AND HITS PLAYER!
                     if (judgement_card.suit == "\u2660") and (10 > judgement_card.rank > 1):
                         print(
-                            f"{self.character}'s judgement card is a {judgement_card} and therefore {pending_judgement} deals THREE DAMAGE, then gets discarded!")
+                            f"{self.character}'s judgement card is a {judgement_card} and therefore {pending_judgement} deals 3 DAMAGE, then gets discarded!")
                         discard_deck.add_to_top(pending_judgement)
                         damage_dealt = 3
                         self.current_health -= damage_dealt
@@ -1482,7 +1486,7 @@ class Player:
                         f"{self.character} must face judgement for ACEDIA; (needs \u2665 to pass, or else misses action-phase of turn).")
                     main_deck.discard_from_deck()
                     judgement_card = discard_deck.contents[0]
-                    print(f"{self.character} flipped a {judgement_card}.")
+                    print(f"  >> {self.character} flipped a {judgement_card}.")
                     if judgement_card.suit == "\u2665":
                         print(
                             f"{self.character}'s judgement card is a {judgement_card} and therefore {pending_judgement} has no effect.")
@@ -1531,7 +1535,7 @@ class Player:
                     f"  >> {self.character} chose to activate their equipped {self.equipment[armor_index]} (armor); needs \u2665 or \u2666 to automatically dodge.")
                 main_deck.discard_from_deck()
                 judgement_card = discard_deck.contents[0]
-                print(f"{self.character} flipped a {judgement_card}.")
+                print(f"  >> {self.character} flipped a {judgement_card}.")
                 if judgement_card.suit == "\u2665" or judgement_card.suit == "\u2666":
                     judgement_card.effect2 = "Defend"
                     return (True, judgement_card)
@@ -1791,7 +1795,7 @@ class Player:
         action_phase_active = True
         while action_phase_active:
             print(" ")
-            if len(players) == 1:
+            if len(players) < 2:
                 return self.start_end_phase()
             actions = self.hand.contents + ["End Action-Phase"]
 
@@ -1829,6 +1833,7 @@ class Player:
 
     def start_end_phase(self):
         print(f"{self.character} has ended their turn!")
+        print("----------------------------------------------------------------------------------------------------")
 
 
 # GAME-STATE
