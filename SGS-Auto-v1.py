@@ -8,13 +8,13 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 11/10/2020
-Version 1.09
+Version 1.10
 
- + 11/10/2020 (v1.09);
- - Reworked priority-order for using Serpent Spear in Barbarians/Duel/Coerce <- Makes EVEN MORE SENSE to just do it as an option alongside ATTACK...
- - More black-pommel-related fixes!
- - More armor-related fixes!
- - Duel-related bugfixes
+ + 11/10/2020 (v1.10);
+ - Documentation for game-phases
+ - Minor bugfixes
+ - More Serpent-Spear-related fixes!
+ - And EVEN MORE Serpent-Spear-related fixes!
 
  TO DO:
  - Greedy Player Mode  
@@ -1066,17 +1066,18 @@ class Player:
 
                 serp_spear = None
                 if (len(self.hand.contents) > 1):
-                    for serp_spear in self.equipment:
-                        if serp_spear.effect == "Serpent Spear":
-                            possible_cards.append(serp_spear)
+                    for item in self.equipment:
+                        if item.effect == "Serpent Spear":
+                            possible_cards.append(item)
+                            serp_spear = True
                             break
 
-                if len(possible_cards) > 0:
+                if (len(possible_cards) > 0) or (serp_spear == True):
                     choices = [True, False]
                     activated = random.choice(choices)
                     if activated:
                         attack = random.choice(possible_cards)
-                        if attack == serp_spear:
+                        if attack not in self.hand.contents:
                             serp_spear = self.check_weapon_serpent_spear()
                             if serp_spear[0]:
                                 attack = serp_spear[1]
@@ -1123,18 +1124,19 @@ class Player:
 
                     serp_spear = None
                     if (len(self.hand.contents) > 1):
-                        for serp_spear in self.equipment:
-                            if serp_spear.effect == "Serpent Spear":
-                                if serp_spear not in possible_cards:
-                                    possible_cards.append(serp_spear)
+                        for item in self.equipment:
+                            if item.effect == "Serpent Spear":
+                                if item not in possible_cards:
+                                    possible_cards.append(item)
+                                    serp_spear = True
                                     break
 
-                    if len(possible_cards) > 0:
+                    if (len(possible_cards) > 0) or (serp_spear == True):
                         choices = [True, False]
                         activated = random.choice(choices)
                         if activated:
                             attack = random.choice(possible_cards)
-                            if attack == serp_spear:
+                            if attack not in self.hand.contents:
                                 serp_spear = self.check_weapon_serpent_spear()
                                 if serp_spear[0]:
                                     attack = serp_spear[1]
@@ -1209,18 +1211,18 @@ class Player:
 
         serp_spear = None
         if (len(self.hand.contents) > 1):
-            for serp_spear in self.equipment:
-                if serp_spear.effect == "Serpent Spear":
-                    possible_cards.append(serp_spear)
+            for item in self.equipment:
+                if item.effect == "Serpent Spear":
+                    possible_cards.append(item)
+                    serp_spear = True
                     break
 
-        if len(possible_cards) > 0:
+        if (len(possible_cards) > 0) or (serp_spear == True):
             choices = [True, False]
             activated = random.choice(choices)
             if activated:
-                card2 = None
                 card = random.choice(possible_cards)
-                if card == serp_spear:
+                if card not in self.hand.contents:
                     serp_spear = self.check_weapon_serpent_spear()
                     if serp_spear[0]:
                         return self.activate_attack(serp_spear[1], target, serp_spear[2])
@@ -1234,7 +1236,7 @@ class Player:
                     extra_targets = self.check_weapon_sky_scorcher_halberd(
                         target)
                     if (extra_targets == 0):
-                        self.activate_attack(card, target, card2)
+                        self.activate_attack(card, target)
                     elif (extra_targets[0] == 1):
                         self.activate_attack(card, target)
                         self.activate_attack(card, extra_targets[1])
@@ -1244,14 +1246,13 @@ class Player:
                         self.activate_attack(card, extra_targets[2])
                     return True
 
-        else:
-            for item in self.equipment:
-                if item.ctype == "Weapon":
-                    self.equipment.remove(item)
-                    players[0].hand.add_to_top(item)
-                    print(
-                        f"{self.character}: Your weapon has been stolen by {players[0].character} for not attacking {target.character}!")
-                    return True
+        for item in self.equipment:
+            if item.ctype == "Weapon":
+                self.equipment.remove(item)
+                players[0].hand.add_to_top(item)
+                print(
+                    f"{self.character}: Your weapon has been stolen by {players[0].character} for not attacking {target.character}!")
+                return True
 
     def activate_dismantle(self, card, target):
         # 'card' refers to the 'Dismantle' card used in Player.use_card_effect(card)
@@ -1789,10 +1790,20 @@ class Player:
                     f"  >> {self.character} has {self.equipment[item_index]} equipped, and therefore has no limit to the amount of attacks per turn.")
                 return True
 
-    # Game-Phases
+    # --- Game-Phases
+    # 1. "Beginning Phase" determines the start of a turn, resetting all "once-per-turn" effects.
+    #       In some cases, certain character-abilities can apply here.
+    # 2. "Judgement Phase" is where any pending-judgements from Delay-Tool cards apply.
+    # 3. "Drawing Phase" is where the player gets to draw 2 cards for their turn.
+    #       In some cases, certain character-abilities can alter the number, and possibly cause various effects as a result!
+    #       If a player is affected by RATIONS DEPLETED (in their judgement phase), they forfeit their drawing phase.
+    # 4. "Action Phase" refers to where a player can use cards and use activatable-character abilities.
+    #       If a player is affected by ACEDIA (in their judgement phase), they forfeit their action phase.
+    # 5. "Discard Phase" refers to where a player must discard hand-cards, such that they do not exceed their current_health level.
+    #       Certain character abilities can alter this behaviour.
+    # 6. "End Phase" only applies to some characters. In most cases, nothing happens here.
     def start_beginning_phase(self):
         self.reset_once_per_turn()
-        print(" ")
         print(f"{self.character} has started their turn!")
         return self.start_judgement_phase()
 
@@ -1858,7 +1869,7 @@ class Player:
 # GAME-STATE
 # GAME-STATE
 # GAME-STATE
-players = generate_players(6)
+players = generate_players(10)
 main_deck = Deck(all_cards)
 discard_deck = Deck([])
 main_deck.shuffle()
