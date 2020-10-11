@@ -8,14 +8,12 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 11/10/2020
-Version 1.07
+Version 1.08
 
- + 11/10/2020 (v1.07);
- - Fixed bug when targeting player with ONLY a negate in-hand (used) // secondary check added to activate_dismantle()/activate_steal()
- - Fixed bug with DUEL displaying wrong player-names
- - Added print-statements to DUEL
- - Reduced unnecessary Black Pommel statements, by only applying when Black-Shield is also equipped and weapon effect then applies
- - Added print('---') between player turns ending and starting!
+ + 11/10/2020 (v1.08);
+ - Reworked priority-order for using Serpent Spear in Barbarians/Duel/Coerce <- Makes more sense to check ATTACKS before checking weapon
+ - Minor bugfixes to Player.activate_coerce()
+ - Bugfix to prevent Serpent Spear allowing you to discard cards but not ATTACK (if you already attacked this turn)
 
  TO DO:
  - Greedy Player Mode  
@@ -1060,18 +1058,20 @@ class Player:
                         if item.effect == "Serpent Spear":
                             weapon = True
                             break
-                if weapon:
-                    serp_spear = self.check_weapon_serpent_spear()
-                    if serp_spear[0]:
-                        attack = serp_spear[1]
-                        return attack
 
                 if len(possible_cards) > 0:
                     choices = [True, False]
                     activated = random.choice(choices)
-                    attack = random.choice(possible_cards)
-                    self.hand.contents.remove(attack)
-                    discard_deck.add_to_top(attack)
+                    if activated:
+                        attack = random.choice(possible_cards)
+                        self.hand.contents.remove(attack)
+                        discard_deck.add_to_top(attack)
+                        return attack
+
+                if weapon:
+                    serp_spear = self.check_weapon_serpent_spear()
+                    if serp_spear[0]:
+                        attack = serp_spear[1]
                 return attack
 
             elif response_required == "Defend" and card.effect2 == "Rain of Arrows":
@@ -1117,12 +1117,8 @@ class Player:
                             if item.effect == "Serpent Spear":
                                 weapon = True
                                 break
-                    if weapon:
-                        serp_spear = self.check_weapon_serpent_spear()
-                        if serp_spear[0]:
-                            required -= 1
 
-                    elif len(possible_cards) > 0:
+                    if len(possible_cards) > 0:
                         choices = [True, False]
                         activated = random.choice(choices)
                         if activated:
@@ -1131,6 +1127,13 @@ class Player:
                             discard_deck.add_to_top(attack)
                             print(
                                 f"{self.character} played an {attack} during the duel!")
+                            required -= 1
+                        else:
+                            return True
+
+                    if weapon:
+                        serp_spear = self.check_weapon_serpent_spear()
+                        if serp_spear[0]:
                             required -= 1
                         else:
                             return True
@@ -1193,9 +1196,34 @@ class Player:
             if item.effect == "Attack":
                 possible_cards.append(item)
 
+        if len(possible_cards) > 0:
+            choices = [True, False]
+            activated = random.choice(choices)
+            if activated:
+                card2 = None
+                card = random.choice(possible_cards)
+                self.hand.contents.remove(card)
+                discard_deck.add_to_top(card)
+                card.effect2 = "Attack"
+
+                print(
+                    f"{self.character} was coerced into attacking {target.character}.")
+                extra_targets = self.check_weapon_sky_scorcher_halberd(target)
+                if (extra_targets == 0):
+                    self.activate_attack(card, target, card2)
+                elif (extra_targets[0] == 1):
+                    self.activate_attack(card, target)
+                    self.activate_attack(card, extra_targets[1])
+                elif (extra_targets[0] == 2):
+                    self.activate_attack(card, target)
+                    self.activate_attack(card, extra_targets[1])
+                    self.activate_attack(card, extra_targets[2])
+                return True
+
         serp_spear = self.check_weapon_serpent_spear()
         if serp_spear[0]:
             return self.activate_attack(serp_spear[1], target, serp_spear[2])
+
         else:
             for item in self.equipment:
                 if item.ctype == "Weapon":
@@ -1203,37 +1231,7 @@ class Player:
                     players[0].hand.add_to_top(item)
                     print(
                         f"{self.character}: Your weapon has been stolen by {players[0].character} for not attacking {target.character}!")
-                    break
-            return False
-
-        choices = [True, False]
-        activated = random.choice(choices)
-        if activated:
-            card2 = None
-            card = random.choice(possible_cards)
-            self.hand.contents.remove(card)
-            discard_deck.add_to_top(card)
-
-            print(
-                f"{self.character} was coerced into attacking {target.character}.")
-            extra_targets = self.check_weapon_sky_scorcher_halberd(target)
-            if (extra_targets == 0):
-                self.activate_attack(card, target, card2)
-            elif (extra_targets[0] == 1):
-                self.activate_attack(card, target)
-                self.activate_attack(card, extra_targets[1])
-            elif (extra_targets[0] == 2):
-                self.activate_attack(card, target)
-                self.activate_attack(card, extra_targets[1])
-                self.activate_attack(card, extra_targets[2])
-        else:
-            for item in self.equipment:
-                if item.ctype == "Weapon":
-                    self.equipment.remove(item)
-                    players[0].hand.add_to_top(item)
-                    print(
-                        f"{self.character}: Your weapon has been stolen by {players[0].character} for not attacking {target.character}!")
-                    break
+                    return True
 
     def activate_dismantle(self, card, target):
         # 'card' refers to the 'Dismantle' card used in Player.use_card_effect(card)
@@ -1802,7 +1800,7 @@ class Player:
             # Serpent Spear Check
             serp_spear = None
             total_cards = self.hand.contents
-            if len(total_cards) > 1:
+            if (len(total_cards) > 1) and (self.attacks_this_turn == 0):
                 for serp_spear in self.equipment:
                     if serp_spear.effect == "Serpent Spear":
                         actions.append(serp_spear)
