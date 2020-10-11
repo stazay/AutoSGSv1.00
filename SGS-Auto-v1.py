@@ -1,6 +1,6 @@
 """
-    __________   ___     ____    ___  __________  ___    ___  __________  __________   ___   ___  ___      ___
-   / _______//  / ||    /   ||  / // / _______// / //   / // / _____  // / _______//  / //  / // / ||     / //
+    __________   ___     ____    ___  _________   ___    ___  __________  __________   ___   ___  ___      ___
+   / _______//  / ||    /   ||  / // / ______//  / //   / // / _____  // / _______//  / //  / // / ||     / //
   / //_______  /  ||   / /| || / // / // ____   / //   / // / //   / // / //_______  / //__/ // /  ||    / //
  /_______  // / ` ||  / //| ||/ // / // /_  // / //   / // / //   / // /_______  // / ____  // / ` ||   /_//
  _______/ // / /| || / // | |/ // / //___/ // / //___/ // / //___/ //  _______/ // / //  / // / /| ||  ___
@@ -8,12 +8,13 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 11/10/2020
-Version 1.08
+Version 1.09
 
- + 11/10/2020 (v1.08);
- - Reworked priority-order for using Serpent Spear in Barbarians/Duel/Coerce <- Makes more sense to check ATTACKS before checking weapon
- - Minor bugfixes to Player.activate_coerce()
- - Bugfix to prevent Serpent Spear allowing you to discard cards but not ATTACK (if you already attacked this turn)
+ + 11/10/2020 (v1.09);
+ - Reworked priority-order for using Serpent Spear in Barbarians/Duel/Coerce <- Makes EVEN MORE SENSE to just do it as an option alongside ATTACK...
+ - More black-pommel-related fixes!
+ - More armor-related fixes!
+ - Duel-related bugfixes
 
  TO DO:
  - Greedy Player Mode  
@@ -1014,7 +1015,18 @@ class Player:
 
                 defend = 0
                 while required > 0:
-                    if not cplayer.check_weapon_black_pommel():
+
+                    armor = False
+                    for eight_trigrams in self.equipment:
+                        if eight_trigrams.effect == "Eight-Trigrams":
+                            armor = True
+                            break
+
+                    if cplayer.check_weapon_black_pommel() and armor:
+                        print(
+                            f"  >> {cplayer.character} has [Black Pommel <:2:> - 6\u2660] equipped, and therefore ignores any armor when attacking.")
+
+                    elif not cplayer.check_weapon_black_pommel():
                         armor_check = self.check_armor_eight_trigrams()
                         if not self.used_trigrams:
                             self.used_trigrams = True
@@ -1022,6 +1034,7 @@ class Player:
                                 self.used_trigrams = False
                                 required -= 1
                                 defend = armor_check[1]
+                                defend.effect2 = "Defend"
                                 if required == 0:
                                     return defend
 
@@ -1051,12 +1064,11 @@ class Player:
                     if item.effect == "Attack":
                         possible_cards.append(item)
 
-                weapon = False
-                total_cards = self.hand.contents
-                if len(total_cards) > 1:
-                    for item in self.equipment:
-                        if item.effect == "Serpent Spear":
-                            weapon = True
+                serp_spear = None
+                if (len(self.hand.contents) > 1):
+                    for serp_spear in self.equipment:
+                        if serp_spear.effect == "Serpent Spear":
+                            possible_cards.append(serp_spear)
                             break
 
                 if len(possible_cards) > 0:
@@ -1064,14 +1076,14 @@ class Player:
                     activated = random.choice(choices)
                     if activated:
                         attack = random.choice(possible_cards)
-                        self.hand.contents.remove(attack)
-                        discard_deck.add_to_top(attack)
-                        return attack
+                        if attack == serp_spear:
+                            serp_spear = self.check_weapon_serpent_spear()
+                            if serp_spear[0]:
+                                attack = serp_spear[1]
+                        else:
+                            self.hand.contents.remove(attack)
+                            discard_deck.add_to_top(attack)
 
-                if weapon:
-                    serp_spear = self.check_weapon_serpent_spear()
-                    if serp_spear[0]:
-                        attack = serp_spear[1]
                 return attack
 
             elif response_required == "Defend" and card.effect2 == "Rain of Arrows":
@@ -1104,44 +1116,41 @@ class Player:
                 print(
                     f"{self.character}: You having a DUEL vs {rplayer.character}; please choose a response (an ATTACK card or do nothing)!")
                 while required > 0:
-
                     possible_cards = []
                     for item in self.hand.contents:
                         if item.effect == "Attack":
                             possible_cards.append(item)
 
-                    weapon = False
-                    total_cards = self.hand.contents
-                    if len(total_cards) > 1:
-                        for item in self.equipment:
-                            if item.effect == "Serpent Spear":
-                                weapon = True
-                                break
+                    serp_spear = None
+                    if (len(self.hand.contents) > 1):
+                        for serp_spear in self.equipment:
+                            if serp_spear.effect == "Serpent Spear":
+                                if serp_spear not in possible_cards:
+                                    possible_cards.append(serp_spear)
+                                    break
 
                     if len(possible_cards) > 0:
                         choices = [True, False]
                         activated = random.choice(choices)
                         if activated:
                             attack = random.choice(possible_cards)
-                            self.hand.contents.remove(attack)
-                            discard_deck.add_to_top(attack)
-                            print(
-                                f"{self.character} played an {attack} during the duel!")
-                            required -= 1
+                            if attack == serp_spear:
+                                serp_spear = self.check_weapon_serpent_spear()
+                                if serp_spear[0]:
+                                    attack = serp_spear[1]
+                                    required -= 1
+                            else:
+                                self.hand.contents.remove(attack)
+                                discard_deck.add_to_top(attack)
+                                print(
+                                    f"{self.character} played an {attack} during the duel!")
+                                required -= 1
                         else:
                             return True
-
-                    if weapon:
-                        serp_spear = self.check_weapon_serpent_spear()
-                        if serp_spear[0]:
-                            required -= 1
-                        else:
-                            return True
-
                     elif len(possible_cards) < 1:
                         return True
 
-                duel_won = cplayer.use_reaction_effect(
+                duel_won = rplayer.use_reaction_effect(
                     "Attack", 1, card, rplayer, cplayer)
                 if duel_won:
                     return False
@@ -1157,9 +1166,11 @@ class Player:
         # Weapon and Black Shield checks
         self.check_gender_swords(target)
         if (card2 == None) or (card2.effect2 == "Black Attack"):
-            if target.check_armor_black_shield(card) and self.check_weapon_black_pommel():
-                pass
-            elif target.check_armor_black_shield(card):
+            armor = target.check_armor_black_shield(card)
+            if self.check_weapon_black_pommel() and armor:
+                print(
+                    f"  >> {self.character} has [Black Pommel <:2:> - 6\u2660] equipped, and therefore ignores any armor when attacking.")
+            elif armor:
                 return False
 
             # Check for DEFEND
@@ -1196,33 +1207,42 @@ class Player:
             if item.effect == "Attack":
                 possible_cards.append(item)
 
+        serp_spear = None
+        if (len(self.hand.contents) > 1):
+            for serp_spear in self.equipment:
+                if serp_spear.effect == "Serpent Spear":
+                    possible_cards.append(serp_spear)
+                    break
+
         if len(possible_cards) > 0:
             choices = [True, False]
             activated = random.choice(choices)
             if activated:
                 card2 = None
                 card = random.choice(possible_cards)
-                self.hand.contents.remove(card)
-                discard_deck.add_to_top(card)
-                card.effect2 = "Attack"
+                if card == serp_spear:
+                    serp_spear = self.check_weapon_serpent_spear()
+                    if serp_spear[0]:
+                        return self.activate_attack(serp_spear[1], target, serp_spear[2])
+                else:
+                    self.hand.contents.remove(card)
+                    discard_deck.add_to_top(card)
+                    card.effect2 = "Attack"
 
-                print(
-                    f"{self.character} was coerced into attacking {target.character}.")
-                extra_targets = self.check_weapon_sky_scorcher_halberd(target)
-                if (extra_targets == 0):
-                    self.activate_attack(card, target, card2)
-                elif (extra_targets[0] == 1):
-                    self.activate_attack(card, target)
-                    self.activate_attack(card, extra_targets[1])
-                elif (extra_targets[0] == 2):
-                    self.activate_attack(card, target)
-                    self.activate_attack(card, extra_targets[1])
-                    self.activate_attack(card, extra_targets[2])
-                return True
-
-        serp_spear = self.check_weapon_serpent_spear()
-        if serp_spear[0]:
-            return self.activate_attack(serp_spear[1], target, serp_spear[2])
+                    print(
+                        f"{self.character} was coerced into attacking {target.character}.")
+                    extra_targets = self.check_weapon_sky_scorcher_halberd(
+                        target)
+                    if (extra_targets == 0):
+                        self.activate_attack(card, target, card2)
+                    elif (extra_targets[0] == 1):
+                        self.activate_attack(card, target)
+                        self.activate_attack(card, extra_targets[1])
+                    elif (extra_targets[0] == 2):
+                        self.activate_attack(card, target)
+                        self.activate_attack(card, extra_targets[1])
+                        self.activate_attack(card, extra_targets[2])
+                    return True
 
         else:
             for item in self.equipment:
@@ -1424,7 +1444,8 @@ class Player:
                 if not negated:
                     main_deck.discard_from_deck()
                     judgement_card = discard_deck.contents[0]
-                    print(f"  >> {self.character} flipped a {judgement_card}.")
+                    print(
+                        f"  >> Judgement: {self.character} flipped a {judgement_card}.")
 
                     # IF JUDGEMENT OCCURS AND HITS PLAYER!
                     if (judgement_card.suit == "\u2660") and (10 > judgement_card.rank > 1):
@@ -1484,7 +1505,8 @@ class Player:
                         f"{self.character} must face judgement for ACEDIA; (needs \u2665 to pass, or else misses action-phase of turn).")
                     main_deck.discard_from_deck()
                     judgement_card = discard_deck.contents[0]
-                    print(f"  >> {self.character} flipped a {judgement_card}.")
+                    print(
+                        f"  >> Judgement: {self.character} flipped a {judgement_card}.")
                     if judgement_card.suit == "\u2665":
                         print(
                             f"{self.character}'s judgement card is a {judgement_card} and therefore {pending_judgement} has no effect.")
@@ -1533,7 +1555,8 @@ class Player:
                     f"  >> {self.character} chose to activate their equipped {self.equipment[armor_index]} (armor); needs \u2665 or \u2666 to automatically dodge.")
                 main_deck.discard_from_deck()
                 judgement_card = discard_deck.contents[0]
-                print(f"  >> {self.character} flipped a {judgement_card}.")
+                print(
+                    f"  >> Judgement: {self.character} flipped a {judgement_card}.")
                 if judgement_card.suit == "\u2665" or judgement_card.suit == "\u2666":
                     judgement_card.effect2 = "Defend"
                     return (True, judgement_card)
@@ -1575,10 +1598,8 @@ class Player:
                 return True
 
     def check_weapon_black_pommel(self):
-        for item_index, item in enumerate(self.equipment):
+        for item in self.equipment:
             if item.effect == "Black Pommel":
-                print(
-                    f"  >> {self.character} has {self.equipment[item_index]} equipped, and therefore ignores any armor when attacking.")
                 return True
 
     def check_frost_blade(self, target):
