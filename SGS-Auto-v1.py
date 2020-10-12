@@ -8,14 +8,11 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 12/10/2020
-Version 1.11
+Version 1.12
 
- + 12/10/2020 (v1.11);
- - Yet EVEN more Serpent-Spear related fixes!
- - Added turn-number counter
- - Removed generate_char_names() & generate_genders(), and incorporated within generate_players()
- - Removed char_names_from_list() and genders_from_list(), and incorporated within generate players()
- - Minor updates to Player.__str__()
+ + 12/10/2020 (v1.12);
+ - Consistent Serpent-Spear checks throughout code (Action-Phase, Coerce, Barbarians response, Duel response)
+ - Major bugfix in Player.activate_attack()
 
  TO DO:
  - Greedy Player Mode  
@@ -578,7 +575,7 @@ class Player:
                         discard_deck.add_to_top(card2)
                     print(
                         f"{self.character} has played a COLOURLESS ATTACK against {target.character}.")
-                    self.activate_attack(card, target)
+                    self.activate_attack(card, target, card2)
                     return True
             else:
                 print(
@@ -646,6 +643,9 @@ class Player:
                         if (barb_response.effect == "Attack") or (barb_response.effect2 == "Attack"):
                             print(
                                 f"{player.character} successfully defended against BARBARIANS with {barb_response}.")
+                        if (barb_response.effect2 == "Black Attack") or (barb_response.effect2 == "Red Attack") or (barb_response.effect2 == "Colourless Attack"):
+                            print(
+                                f"{player.character} successfully defended against BARBARIANS with an ATTACK via SERPENT SPEAR!")
                     else:
                         print(
                             f"{player.character} failed to defend from BARBARIANS!")
@@ -1052,18 +1052,17 @@ class Player:
 
                 serp_spear = None
                 if (len(self.hand.contents) > 1):
-                    for item in self.equipment:
-                        if item.effect == "Serpent Spear":
-                            possible_cards.append(item)
-                            serp_spear = True
+                    for serp_spear in self.equipment:
+                        if serp_spear.effect == "Serpent Spear":
+                            possible_cards.append(serp_spear)
                             break
 
-                if (len(possible_cards) > 0) or (serp_spear == True):
+                if (len(possible_cards) > 0) or (serp_spear in possible_cards):
                     choices = [True, False]
                     activated = random.choice(choices)
                     if activated:
                         attack = random.choice(possible_cards)
-                        if attack not in self.hand.contents:
+                        if attack == serp_spear:
                             serp_spear = self.check_weapon_serpent_spear()
                             if serp_spear[0]:
                                 attack = serp_spear[1]
@@ -1110,19 +1109,17 @@ class Player:
 
                     serp_spear = None
                     if (len(self.hand.contents) > 1):
-                        for item in self.equipment:
-                            if item.effect == "Serpent Spear":
-                                if item not in possible_cards:
-                                    possible_cards.append(item)
-                                    serp_spear = True
-                                    break
+                        for serp_spear in self.equipment:
+                            if serp_spear.effect == "Serpent Spear":
+                                possible_cards.append(serp_spear)
+                                break
 
-                    if (len(possible_cards) > 0) or (serp_spear == True):
+                    if (len(possible_cards) > 0) or (serp_spear in possible_cards):
                         choices = [True, False]
                         activated = random.choice(choices)
                         if activated:
                             attack = random.choice(possible_cards)
-                            if attack not in self.hand.contents:
+                            if attack == serp_spear:
                                 serp_spear = self.check_weapon_serpent_spear()
                                 if serp_spear[0]:
                                     attack = serp_spear[1]
@@ -1161,32 +1158,32 @@ class Player:
             elif armor:
                 return False
 
-            # Check for DEFEND
-            defend_required = 1
-            attack_defended = target.use_reaction_effect(
-                "Defend", defend_required, card, self, target)
-            if type(attack_defended) == Card:
-                if (attack_defended.effect == "Defend") or (attack_defended.effect2 == "Defend"):
-                    print(
-                        f"{target.character} successfully defended the ATTACK with {attack_defended}.")
+        # Check for DEFEND
+        defend_required = 1
+        attack_defended = target.use_reaction_effect(
+            "Defend", defend_required, card, self, target)
+        if type(attack_defended) == Card:
+            if (attack_defended.effect == "Defend") or (attack_defended.effect2 == "Defend"):
+                print(
+                    f"{target.character} successfully defended the ATTACK with {attack_defended}.")
 
-                    # DEFENDED - reactionary abilities
-                    self.check_weapon_axe(target)
-                    self.check_weapon_green_dragon_halberd(target)
-            else:
-                # DAMAGED - pre-damage abilities
-                if self.check_frost_blade(target):
-                    return "Break"
+                # DEFENDED - reactionary abilities
+                self.check_weapon_axe(target)
+                self.check_weapon_green_dragon_halberd(target)
+        else:
+            # DAMAGED - pre-damage abilities
+            if self.check_frost_blade(target):
+                return "Break"
 
-                # Damage Resolution
-                damage_dealt = 1
-                target.current_health -= damage_dealt
-                print(f"{self.character} attacked {target.character}, dealing {damage_dealt} damage ({target.current_health}/{target.max_health} HP remaining).")
-                self.check_weapon_huangs_longbow(target)
-                for player in players:
-                    if player.current_health < 1:
-                        if player.check_brink_of_death_loop(self) == "Break":
-                            return "Break"
+            # Damage Resolution
+            damage_dealt = 1
+            target.current_health -= damage_dealt
+            print(f"{self.character} attacked {target.character}, dealing {damage_dealt} damage ({target.current_health}/{target.max_health} HP remaining).")
+            self.check_weapon_huangs_longbow(target)
+            for player in players:
+                if player.current_health < 1:
+                    if player.check_brink_of_death_loop(self) == "Break":
+                        return "Break"
 
     def activate_coerce(self, target):
         # 'target' refers to the player that will potentially be attacked by the coerced player!
@@ -1738,8 +1735,8 @@ class Player:
         if weapon:
             print(
                 f"  >> {self.character} has used their last hand-card to ATTACK {target.character} with {self.equipment[weapon_index]}. They can target up to two extra players!")
-            target_index1 = get_player_index(target)
             targets = self.calculate_targets_in_weapon_range()
+            target_index1 = get_player_index(target)
             targets.remove(target_index1)
             if len(targets) < 1:
                 print(
@@ -1814,8 +1811,7 @@ class Player:
 
             # Serpent Spear Check
             serp_spear = None
-            total_cards = self.hand.contents
-            if (len(total_cards) > 1) and (self.attacks_this_turn == 0):
+            if (len(self.hand.contents) > 1) and (self.attacks_this_turn == 0):
                 for serp_spear in self.equipment:
                     if serp_spear.effect == "Serpent Spear":
                         actions.append(serp_spear)
