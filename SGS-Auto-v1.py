@@ -7,14 +7,15 @@
 /________// /_//|_||/_//  |___// /________// /________// /________//  /________// /_//  /_// /_//| || /_//
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
-Current Version: 11/10/2020
-Version 1.10
+Current Version: 12/10/2020
+Version 1.11
 
- + 11/10/2020 (v1.10);
- - Documentation for game-phases
- - Minor bugfixes
- - More Serpent-Spear-related fixes!
- - And EVEN MORE Serpent-Spear-related fixes!
+ + 12/10/2020 (v1.11);
+ - Yet EVEN more Serpent-Spear related fixes!
+ - Added turn-number counter
+ - Removed generate_char_names() & generate_genders(), and incorporated within generate_players()
+ - Removed char_names_from_list() and genders_from_list(), and incorporated within generate players()
+ - Minor updates to Player.__str__()
 
  TO DO:
  - Greedy Player Mode  
@@ -23,36 +24,19 @@ import random
 
 
 # --- Game-Setup
-def generate_char_names():
-    return ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"]
-
-
-def generate_genders():
-    genders = ["Male", "Male", "Male", "Male", "Male",
-               "Female", "Female", "Female", "Female", "Female"]
-    random.shuffle(genders)
-    return genders
-
-
 def generate_players(num):
     # 'num' refers to the number of players you want to generate
     if num > 10:
         num = 10
     if 3 > num:
         num = 3
-    char_names = generate_char_names()
-    genders = generate_genders()
-    players = [Player(char_names_from_list(char_names), genders_from_list(genders))
+    char_names = ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"]
+    genders = ["Male", "Male", "Male", "Male", "Male",
+               "Female", "Female", "Female", "Female", "Female"]
+    random.shuffle(genders)
+    players = [Player(char_names.pop(0), genders.pop(0))
                for player_number in range(num)]
     return players
-
-
-def char_names_from_list(char_names):
-    return char_names.pop(0)
-
-
-def genders_from_list(genders):
-    return genders.pop()
 
 
 # --- Loose Functions
@@ -411,18 +395,20 @@ class Hand(Deck):
 
 
 # --- A class for individual players and their stats in the game
-# 1. 'Character' is a PLACEHOLDER for future versions when character-cards are introduced! Currently you get a number only (eg. p5)
-# 2. 'Gender' is a PLACEHOLDER for future versions when character-cards are introduced! Currently you get M/F at random
-# 3. 'Attacks_this_turn' is defaultly set to 0; players can only do 1 ATTACK per turn unless a crossbow is equipped
-# 4. 'Current_health' is defaultly set to 4 (this will change in future versions); when a players' health reaches 0, they are on the BRINK OF DEATH!
-# 5. 'Max_health' is defaultly set to 4 (this will change in future versions); current_health cannot exceed max_health
-# 6. 'Hand' refers to the playing-cards in a players' hand
-# 7. 'Equipment' refers to equipped items; only one of each type of equipment can be equipped at one time
-# 8. 'Pending_judgements' refers to any Delay-Tool cards that have yet to take effect on a player. These take effect at the start of their turn
-# 9. 'Acedia_active' refers to having failed the judgement (above), and this player misses their action-phase of their turn - False by default
-# 10. 'Tools_immunity' refers to having had a Tool-card negated for an individual player - False by default
+# 1. 'Turn_number' is a counter that will return how many turns this player has had at the end of the game.
+# 2. 'Character' is a PLACEHOLDER for future versions when character-cards are introduced! Currently you get a number only (eg. p5)
+# 3. 'Gender' is a PLACEHOLDER for future versions when character-cards are introduced! Currently you get M/F at random
+# 4. 'Attacks_this_turn' is defaultly set to 0; players can only do 1 ATTACK per turn unless a crossbow is equipped
+# 5. 'Current_health' is defaultly set to 4 (this will change in future versions); when a players' health reaches 0, they are on the BRINK OF DEATH!
+# 6. 'Max_health' is defaultly set to 4 (this will change in future versions); current_health cannot exceed max_health
+# 7. 'Hand' refers to the playing-cards in a players' hand
+# 8. 'Equipment' refers to equipped items; only one of each type of equipment can be equipped at one time
+# 9. 'Pending_judgements' refers to any Delay-Tool cards that have yet to take effect on a player. These take effect at the start of their turn
+# 10. 'Acedia_active' refers to having failed the judgement (above), and this player misses their action-phase of their turn - False by default
+# 11. 'Tools_immunity' refers to having had a Tool-card negated for an individual player - False by default
 class Player:
     def __init__(self, character=None, gender=None):
+        self.turn_number = 1
         self.character = character
         self.gender = gender
         self.attacks_this_turn = 0
@@ -436,18 +422,18 @@ class Player:
         self.used_trigrams = False
 
     def __str__(self):
-        equips = "Equipment: "
-        pending = "Pending: "
-        character_details = f" {self.character} // {self.current_health}/{self.max_health} HP remaining // "
+        equips = ""
+        pending = " // Pending: "
+        character_details = f"{self.character} // {self.current_health}/{self.max_health} HP remaining"
         for item in self.equipment:
             if item.ctype == "Weapon":
-                equips += (f"W:{item} // ")
+                equips += (f" // W:{item}")
             if item.ctype == "Armor":
-                equips += (f"A:{item} // ")
+                equips += (f" // A:{item}")
             if item.ctype == "-1 Horse":
-                equips += (f"H:{item} // ")
+                equips += (f" // H:{item}")
             if item.ctype == "+1 Horse":
-                equips += (f"H:{item} // ")
+                equips += (f" // H:{item}")
         for item in self.pending_judgements:
             if item.effect2 == "Acedia":
                 pending += "[A]"
@@ -455,11 +441,11 @@ class Player:
                 pending += "[L]"
             if item.effect2 == "Rations Depleted":
                 pending += "[R]"
-        if equips != "Equipment: " and pending != "Pending: ":
+        if equips != "" and pending != " // Pending: ":
             return (character_details + equips + pending)
-        elif equips != "Equipment: ":
+        elif equips != "":
             return (character_details + equips)
-        elif pending != "Pending: ":
+        elif pending != " // Pending: ":
             return (character_details + pending)
         else:
             return (character_details)
@@ -1723,23 +1709,20 @@ class Player:
                 break
 
         if weapon and (len(self.hand.contents) > 1):
-            choices = [True, False]
-            activated = random.choice(choices)
-            if activated:
-                card = self.discard()
-                card2 = self.discard()
-                if (card.suit == "\u2660" or card.suit == "\u2663") and (card2.suit == "\u2660" or card2.suit == "\u2663"):
-                    card.effect2 = "Black Attack"
-                    card2.effect2 = "Black Attack"
-                elif (card.suit == "\u2665" or card.suit == "\u2666") and (card2.suit == "\u2665" or card2.suit == "\u2666"):
-                    card.effect2 = "Red Attack"
-                    card2.effect2 = "Red Attack"
-                else:
-                    card.effect2 = "Colourless Attack"
-                    card.effect2 = "Colourless Attack"
-                print(
-                    f"  >> {self.character} discarded two cards ({card}/{card2} to use as an ATTACK via {self.equipment[weapon_index]}!")
-                return [True, card, card2]
+            card = self.discard()
+            card2 = self.discard()
+            if (card.suit == "\u2660" or card.suit == "\u2663") and (card2.suit == "\u2660" or card2.suit == "\u2663"):
+                card.effect2 = "Black Attack"
+                card2.effect2 = "Black Attack"
+            elif (card.suit == "\u2665" or card.suit == "\u2666") and (card2.suit == "\u2665" or card2.suit == "\u2666"):
+                card.effect2 = "Red Attack"
+                card2.effect2 = "Red Attack"
+            else:
+                card.effect2 = "Colourless Attack"
+                card.effect2 = "Colourless Attack"
+            print(
+                f"  >> {self.character} discarded two cards ({card}/{card2} to use as an ATTACK via {self.equipment[weapon_index]}!")
+            return [True, card, card2]
         return [False]
 
     def check_weapon_sky_scorcher_halberd(self, target):
@@ -1869,7 +1852,7 @@ class Player:
 # GAME-STATE
 # GAME-STATE
 # GAME-STATE
-players = generate_players(10)
+players = generate_players(6)
 main_deck = Deck(all_cards)
 discard_deck = Deck([])
 main_deck.shuffle()
@@ -1884,8 +1867,10 @@ while game_started:
     if len(players) == 1:
         game_started = False
         print(f"{players[0]} has won the game!!!")
+        print(f"Turn number: {players[0].turn_number}!")
     else:
         players[0].start_beginning_phase()
+        players[0].turn_number += 1
         # If alive at end of turn
         if players[0].current_health > 0:
             players.append(players.pop(0))
