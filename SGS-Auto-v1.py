@@ -8,11 +8,12 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 12/10/2020
-Version 1.12
+Version 1.13
 
- + 12/10/2020 (v1.12);
- - Consistent Serpent-Spear checks throughout code (Action-Phase, Coerce, Barbarians response, Duel response)
- - Major bugfix in Player.activate_attack()
+ + 12/10/2020 (v1.13);
+ - generate_deck() function created
+ - play_games(num_players, num_iterations) function created, allowing you to decide how many games you want to automatically play :D
+ - Player.use_card_effect() to return True/False if pass/fail
 
  TO DO:
  - Greedy Player Mode  
@@ -34,6 +35,256 @@ def generate_players(num):
     players = [Player(char_names.pop(0), genders.pop(0))
                for player_number in range(num)]
     return players
+
+
+def generate_deck():
+    # The deck! (108 cards total)
+    global main_deck
+    all_cards = [
+        Card(1, 'A', '\u2660', 'Tool', 'Duel', 'You can target any player for a duel with this card. If the target does not play an ATTACK, they are damaged. If they do ATTACK, then you must play one in response or take damage. Whoever does not attack, takes damage.'),
+        Card(1, 'A', '\u2660', 'Delay-Tool', 'Lightning', 'You can place this Delay-Tool on yourself. In your next turn, you will perform a judgement for this card; if it is between two and nine of \u2660 (inclusively), you recieve three units of lightning damage. If not, LIGHTNING passes to the next player.'),
+        Card(2, '2', '\u2660', 'Weapon', 'Frost Blade',
+             'When equipped, and an ATTACK hits a target, the wielder has a choice; they can either damage the target or force them to discard two cards.', 2),
+        Card(2, '2', '\u2660', 'Weapon', 'Gender-Swords',
+             'When equipped, and playing an ATTACK on the target, the wielder can force the target to make a choice; to either discard a hand-card or allow the wielder to draw one from the deck.', 2),
+        Card(2, '2', '\u2660', 'Armor', 'Eight-Trigrams',
+             'When equipped: whenever a DEFEND is needed, the wearer can perform a judgement. If it is red, the DEFEND is considered to be played.'),
+        Card(3, '3', '\u2660', 'Tool', 'Dismantle',
+             'You can target any player and discard one of their cards, on-hand or equipped.'),
+        Card(3, '3', '\u2660', 'Tool', 'Steal',
+             'You can use this card on a player within physical range to take a card from them (on-hand or equipped) and add it to your hand.'),
+        Card(4, '4', '\u2660', 'Tool', 'Dismantle',
+             'You can target any player and discard one of their cards, on-hand or equipped.'),
+        Card(4, '4', '\u2660', 'Tool', 'Steal',
+             'You can use this card on a player within physical range to take a card from them (on-hand or equipped) and add it to your hand.'),
+        Card(5, '5', '\u2660', '+1 Horse', '+1 Horse',
+             'When equipped, this horse places you further away from players in distance calculations by +1.'),
+        Card(5, '5', '\u2660', 'Weapon', 'Green Dragon Halberd',
+             "When equipped, and the target of the wielder's ATTACK is DEFENDED against, the wielder may ATTACK again.", 3),
+        Card(6, '6', '\u2660', 'Delay-Tool', 'Acedia',
+             'You can place Delay-Tool on any other player. The target must perform a judgement for this card. If it is not \u2665, they forfeit their action-phase.'),
+        Card(6, '6', '\u2660', 'Weapon', 'Black Pommel',
+             'When equipped, the wielder ignores any armor of their targets.', 2),
+        Card(7, '7', '\u2660', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(7, '7', '\u2660', 'Tool', 'Barbarians',
+             'All other players must play an ATTACK or else suffer one damage.'),
+        Card(8, '8', '\u2660', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(8, '8', '\u2660', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(9, '9', '\u2660', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(9, '9', '\u2660', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(10, '10', '\u2660', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(10, '10', '\u2660', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(11, 'J', '\u2660', 'Tool', 'Negate',
+             'Any player may play this card in response to a tool card being played. This prevents that tool card from working.'),
+        Card(11, 'J', '\u2660', 'Tool', 'Steal',
+             'You can use this card on a player within physical range to take a card from them (on-hand or equipped) and add it to your hand.'),
+        Card(12, 'Q', '\u2660', 'Tool', 'Dismantle',
+             'You can target any player and discard one of their cards, on-hand or equipped.'),
+        Card(12, 'Q', '\u2660', 'Weapon', 'Serpent Spear',
+             'When equipped, the wielder can discard any two cards to behave as an ATTACK.', 3),
+        Card(13, 'K', '\u2660', 'Tool', 'Barbarians',
+             'All other players must play an ATTACK or else suffer one damage.'),
+        Card(13, 'K', '\u2660', '-1 Horse', '-1 Horse',
+             'When equipped, this horse places other players closer to you in distance calculations by -1.'),
+        Card(1, 'A', '\u2665', 'Tool', 'Peach Gardens',
+             'All damaged players will be healed by one health.'),
+        Card(1, 'A', '\u2665', 'Tool', 'Rain of Arrows',
+             'All other players must play a DEFEND or else suffer one damage.'),
+        Card(2, '2', '\u2665', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(2, '2', '\u2665', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(3, '3', '\u2665', 'Basic', 'Peach',
+             'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
+        Card(3, '3', '\u2665', 'Tool', 'Granary',
+             'You can use this card to flip over one card for every living player. Then, starting with the user of this card, each player will select a card and add it to their hand.'),
+        Card(4, '4', '\u2665', 'Basic', 'Peach', 'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
+        Card(4, '4', '\u2665', 'Tool', 'Granary',
+             'You can use this card to flip over one card for every living player. Then, starting with the user of this card, each player will select a card and add it to their hand.'),
+        Card(5, '5', '\u2665', '-1 Horse', '-1 Horse',
+             'When equipped, this horse places other players closer to you in distance calculations by -1.'),
+        Card(5, '5', '\u2665', 'Weapon', "Huang's Longbow",
+             'When equipped, if the wielder successfully damages another player with an ATTACK, they can discard any horse of the target player.', 5),
+        Card(6, '6', '\u2665', 'Basic', 'Peach', 'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
+        Card(6, '6', '\u2665', 'Delay-Tool', 'Acedia',
+             'You can place Delay-Tool on any other player. The target must perform a judgement for this card. If it is not \u2665, they forfeit their action-phase.'),
+        Card(7, '7', '\u2665', 'Basic', 'Peach',
+             'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
+        Card(7, '7', '\u2665', 'Tool', 'Greed',
+             'Use this card to draw two cards from the deck.'),
+        Card(8, '8', '\u2665', 'Basic', 'Peach',
+             'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
+        Card(8, '8', '\u2665', 'Tool', 'Greed',
+             'Use this card to draw two cards from the deck.'),
+        Card(9, '9', '\u2665', 'Basic', 'Peach', 'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
+        Card(9, '9', '\u2665', 'Tool', 'Greed',
+             'Use this card to draw two cards from the deck.'),
+        Card(10, '10', '\u2665', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(10, '10', '\u2665', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(11, 'J', '\u2665', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(11, 'J', '\u2665', 'Tool', 'Greed',
+             'Use this card to draw two cards from the deck.'),
+        Card(12, 'Q', '\u2665', 'Basic', 'Peach',
+             'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
+        Card(12, 'Q', '\u2665', 'Tool', 'Dismantle',
+             'You can target any player and discard one of their cards, on-hand or equipped.'),
+        Card(12, 'Q', '\u2665', 'Delay-Tool', 'Lightning',
+             'You can place this Delay-Tool on yourself. In your next turn, you will perform a judgement for this card; if it is between two and nine of \u2660 (inclusively), you recieve three units of lightning damage. If not, the Lightning passes to the next player.'),
+        Card(13, 'K', '\u2665', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(13, 'K', '\u2665', '+1 Horse', '+1 Horse',
+             'When equipped, this horse places you further away from players in distance calculations by +1.'),
+        Card(1, 'A', '\u2663', 'Tool', 'Duel', 'You can target any player for a duel with this card. If the target does not play an ATTACK, they are damaged. If they do ATTACK, then you must play one in response or take damage. Whoever does not attack, takes damage.'),
+        Card(1, 'A', '\u2663', 'Weapon', 'Zhuge Crossbow',
+             'When equipped, the wielder has no limit to the number of ATTACKs they can play in their turn.', 1),
+        Card(2, '2', '\u2663', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(2, '2', '\u2663', 'Armor', 'Black Shield',
+             'When equipped, black ATTACK cards cannot affect the wearer.'),
+        Card(2, '2', '\u2663', 'Armor', 'Eight-Trigrams',
+             'When equipped: whenever a DEFEND is needed, the wearer can perform a judgement. If it is red, the DEFEND is considered to be played.'),
+        Card(3, '3', '\u2663', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(3, '3', '\u2663', 'Tool', 'Dismantle',
+             'You can target any player and discard one of their cards, on-hand or equipped.'),
+        Card(4, '4', '\u2663', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(4, '4', '\u2663', 'Tool', 'Dismantle',
+             'You can target any player and discard one of their cards, on-hand or equipped.'),
+        Card(5, '5', '\u2663', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(5, '5', '\u2663', '+1 Horse', '+1 Horse',
+             'When equipped, this horse places you further away from players in distance calculations by +1.'),
+        Card(6, '6', '\u2663', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(6, '6', '\u2663', 'Delay-Tool', 'Acedia',
+             'You can place Delay-Tool on any other player. The target must perform a judgement for this card. If it is not \u2665, they forfeit their action-phase.'),
+        Card(7, '7', '\u2663', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(7, '7', '\u2663', 'Tool', 'Barbarians',
+             'All other players must play an ATTACK or else suffer one damage.'),
+        Card(8, '8', '\u2663', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(8, '8', '\u2663', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(9, '9', '\u2663', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(9, '9', '\u2663', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(10, '10', '\u2663', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(10, '10', '\u2663', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(11, 'J', '\u2663', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(11, 'J', '\u2663', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(12, 'Q', '\u2663', 'Tool', 'Coerce', 'Use this card to target any other player that possesses a weapon. Afterwards, you can then select any target within their attacking range. Your target can then ATTACK the victim. If they do not, you will take their weapon and add it to your hand.'),
+        Card(12, 'Q', '\u2663', 'Tool', 'Negate',
+             'Any player may play this card in response to a tool card being played. This prevents that tool card from working.'),
+        Card(13, 'K', '\u2663', 'Tool', 'Coerce', 'Use this card to target any other player that possesses a weapon. Afterwards, you can then select any target within their attacking range. Your target can then ATTACK the victim. If they do not, you will take their weapon and add it to your hand.'),
+        Card(13, 'K', '\u2663', 'Tool', 'Negate',
+             'Any player may play this card in response to a tool card being played. This prevents that tool card from working.'),
+        Card(1, 'A', '\u2666', 'Tool', 'Duel', 'You can target any player for a duel with this card. If the target does not play an ATTACK, they are damaged. If they do ATTACK, then you must play one in response or take damage. Whoever does not attack, takes damage.'),
+        Card(1, 'A', '\u2666', 'Weapon', 'Zhuge Crossbow',
+             'When equipped, the wielder has no limit to the number of ATTACKs they can play in their turn.', 1),
+        Card(2, '2', '\u2666', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(2, '2', '\u2666', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(3, '3', '\u2666', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(3, '3', '\u2666', 'Tool', 'Steal',
+             'You can use this card on a player within physical range to take a card from them (on-hand or equipped) and add it to your hand.'),
+        Card(4, '4', '\u2666', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(4, '4', '\u2666', 'Tool', 'Steal',
+             'You can use this card on a player within physical range to take a card from them (on-hand or equipped) and add it to your hand.'),
+        Card(5, '5', '\u2666', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(5, '5', '\u2666', 'Weapon', 'Axe',
+             'When equipped, and the target of the wielder DEFENDs against the ATTACK of the wielder, they can discard two cards to force the damage.', 3),
+        Card(6, '6', '\u2666', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(6, '6', '\u2666', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(7, '7', '\u2666', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(7, '7', '\u2666', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(8, '8', '\u2666', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(8, '8', '\u2666', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(9, '9', '\u2666', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(9, '9', '\u2666', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(10, '10', '\u2666', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(10, '10', '\u2666', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(11, 'J', '\u2666', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(11, 'J', '\u2666', 'Basic', 'Defend',
+             'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
+        Card(12, 'Q', '\u2666', 'Basic', 'Peach',
+             'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
+        Card(12, 'Q', '\u2666', 'Tool', 'Negate',
+             'Any player may play this card in response to a tool card being played. This prevents that tool card from working.'),
+        Card(12, 'Q', '\u2666', 'Weapon', 'Sky Scorcher Halberd',
+             'When equipped and using the last on-hand card to ATTACK, the ATTACK can target an additional two players.', 4),
+        Card(13, 'K', '\u2666', 'Basic', 'Attack',
+             'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
+        Card(13, 'K', '\u2666', '-1 Horse', '-1 Horse',
+             'When equipped, this horse places other players closer to you in distance calculations by -1.')
+    ]
+
+    main_deck = Deck(all_cards)
+    return main_deck
+
+
+def play_games(num_players, num_iterations):
+    # 'num_players' refers to the number of players
+    # 'iterations' refers to the number of iterations that the game will run
+    for i in range(num_iterations):
+        global players
+        global main_deck
+        global discard_deck
+        players = generate_players(num_players)
+        main_deck = generate_deck()
+        discard_deck = Deck([])
+        main_deck.shuffle()
+        print(f"Game {i}: The deck has been shuffled!")
+        for player in players:
+            player.draw(main_deck, 4, False)
+        print("All players have been dealt 4 cards!")
+        game_started = True
+        while game_started:
+            # If one player remaining...
+            if len(players) == 1:
+                game_started = False
+                print(f"{players[0]} has won the game!!!")
+                print(f"Turn number: {players[0].turn_number}!")
+            else:
+                players[0].start_beginning_phase()
+                players[0].turn_number += 1
+                # If alive at end of turn
+                if players[0].current_health > 0:
+                    players.append(players.pop(0))
+                else:
+                    # If dead at end of turn
+                    players.pop(0)
 
 
 # --- Loose Functions
@@ -105,7 +356,7 @@ def check_aoe_negate_loop(given_list, card, cplayer, reacting, og_card=None):
 #                   COERCE (x2), DISMANTLE (x6), DUEL (x3), GREED (x4), NEGATE (x4), STEAL (x5)
 # 5c. 'Delay-Tool cards': ACEDIA (x3), LIGHTNING (x2)
 # 5d. 'Equipment cards': WEAPON (x10), ARMOR (x3), -1 HORSE (x3), +1 HORSE (x3)
-# 6. 'Flavour_text' refers to the description of what the individual card does (for more details, search for all_cards)
+# 6. 'Flavour_text' refers to the description of what the individual card does (for more details, search for all_cards within generate_deck())
 # 7. 'Weapon_range' refers to the range provided by the ten possible weapon-cards (within equipment cards)
 # 8. 'Effect2' refers to the effect that the card will perform (typically after being modified by a character/weapon ability)
 class Card:
@@ -133,218 +384,6 @@ class Card:
 
     def __gt__(self, other):
         return self.rank > other.rank
-
-
-# The deck! (108 cards total)
-all_cards = [
-    Card(1, 'A', '\u2660', 'Tool', 'Duel', 'You can target any player for a duel with this card. If the target does not play an ATTACK, they are damaged. If they do ATTACK, then you must play one in response or take damage. Whoever does not attack, takes damage.'),
-    Card(1, 'A', '\u2660', 'Delay-Tool', 'Lightning', 'You can place this Delay-Tool on yourself. In your next turn, you will perform a judgement for this card; if it is between two and nine of \u2660 (inclusively), you recieve three units of lightning damage. If not, LIGHTNING passes to the next player.'),
-    Card(2, '2', '\u2660', 'Weapon', 'Frost Blade',
-         'When equipped, and an ATTACK hits a target, the wielder has a choice; they can either damage the target or force them to discard two cards.', 2),
-    Card(2, '2', '\u2660', 'Weapon', 'Gender-Swords',
-         'When equipped, and playing an ATTACK on the target, the wielder can force the target to make a choice; to either discard a hand-card or allow the wielder to draw one from the deck.', 2),
-    Card(2, '2', '\u2660', 'Armor', 'Eight-Trigrams',
-         'When equipped: whenever a DEFEND is needed, the wearer can perform a judgement. If it is red, the DEFEND is considered to be played.'),
-    Card(3, '3', '\u2660', 'Tool', 'Dismantle',
-         'You can target any player and discard one of their cards, on-hand or equipped.'),
-    Card(3, '3', '\u2660', 'Tool', 'Steal',
-         'You can use this card on a player within physical range to take a card from them (on-hand or equipped) and add it to your hand.'),
-    Card(4, '4', '\u2660', 'Tool', 'Dismantle',
-         'You can target any player and discard one of their cards, on-hand or equipped.'),
-    Card(4, '4', '\u2660', 'Tool', 'Steal',
-         'You can use this card on a player within physical range to take a card from them (on-hand or equipped) and add it to your hand.'),
-    Card(5, '5', '\u2660', '+1 Horse', '+1 Horse',
-         'When equipped, this horse places you further away from players in distance calculations by +1.'),
-    Card(5, '5', '\u2660', 'Weapon', 'Green Dragon Halberd',
-         "When equipped, and the target of the wielder's ATTACK is DEFENDED against, the wielder may ATTACK again.", 3),
-    Card(6, '6', '\u2660', 'Delay-Tool', 'Acedia',
-         'You can place Delay-Tool on any other player. The target must perform a judgement for this card. If it is not \u2665, they forfeit their action-phase.'),
-    Card(6, '6', '\u2660', 'Weapon', 'Black Pommel',
-         'When equipped, the wielder ignores any armor of their targets.', 2),
-    Card(7, '7', '\u2660', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(7, '7', '\u2660', 'Tool', 'Barbarians',
-         'All other players must play an ATTACK or else suffer one damage.'),
-    Card(8, '8', '\u2660', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(8, '8', '\u2660', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(9, '9', '\u2660', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(9, '9', '\u2660', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(10, '10', '\u2660', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(10, '10', '\u2660', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(11, 'J', '\u2660', 'Tool', 'Negate',
-         'Any player may play this card in response to a tool card being played. This prevents that tool card from working.'),
-    Card(11, 'J', '\u2660', 'Tool', 'Steal',
-         'You can use this card on a player within physical range to take a card from them (on-hand or equipped) and add it to your hand.'),
-    Card(12, 'Q', '\u2660', 'Tool', 'Dismantle',
-         'You can target any player and discard one of their cards, on-hand or equipped.'),
-    Card(12, 'Q', '\u2660', 'Weapon', 'Serpent Spear',
-         'When equipped, the wielder can discard any two cards to behave as an ATTACK.', 3),
-    Card(13, 'K', '\u2660', 'Tool', 'Barbarians',
-         'All other players must play an ATTACK or else suffer one damage.'),
-    Card(13, 'K', '\u2660', '-1 Horse', '-1 Horse',
-         'When equipped, this horse places other players closer to you in distance calculations by -1.'),
-    Card(1, 'A', '\u2665', 'Tool', 'Peach Gardens',
-         'All damaged players will be healed by one health.'),
-    Card(1, 'A', '\u2665', 'Tool', 'Rain of Arrows',
-         'All other players must play a DEFEND or else suffer one damage.'),
-    Card(2, '2', '\u2665', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(2, '2', '\u2665', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(3, '3', '\u2665', 'Basic', 'Peach',
-         'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
-    Card(3, '3', '\u2665', 'Tool', 'Granary',
-         'You can use this card to flip over one card for every living player. Then, starting with the user of this card, each player will select a card and add it to their hand.'),
-    Card(4, '4', '\u2665', 'Basic', 'Peach', 'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
-    Card(4, '4', '\u2665', 'Tool', 'Granary',
-         'You can use this card to flip over one card for every living player. Then, starting with the user of this card, each player will select a card and add it to their hand.'),
-    Card(5, '5', '\u2665', '-1 Horse', '-1 Horse',
-         'When equipped, this horse places other players closer to you in distance calculations by -1.'),
-    Card(5, '5', '\u2665', 'Weapon', "Huang's Longbow",
-         'When equipped, if the wielder successfully damages another player with an ATTACK, they can discard any horse of the target player.', 5),
-    Card(6, '6', '\u2665', 'Basic', 'Peach', 'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
-    Card(6, '6', '\u2665', 'Delay-Tool', 'Acedia',
-         'You can place Delay-Tool on any other player. The target must perform a judgement for this card. If it is not \u2665, they forfeit their action-phase.'),
-    Card(7, '7', '\u2665', 'Basic', 'Peach',
-         'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
-    Card(7, '7', '\u2665', 'Tool', 'Greed',
-         'Use this card to draw two cards from the deck.'),
-    Card(8, '8', '\u2665', 'Basic', 'Peach',
-         'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
-    Card(8, '8', '\u2665', 'Tool', 'Greed',
-         'Use this card to draw two cards from the deck.'),
-    Card(9, '9', '\u2665', 'Basic', 'Peach', 'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
-    Card(9, '9', '\u2665', 'Tool', 'Greed',
-         'Use this card to draw two cards from the deck.'),
-    Card(10, '10', '\u2665', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(10, '10', '\u2665', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(11, 'J', '\u2665', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(11, 'J', '\u2665', 'Tool', 'Greed',
-         'Use this card to draw two cards from the deck.'),
-    Card(12, 'Q', '\u2665', 'Basic', 'Peach',
-         'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
-    Card(12, 'Q', '\u2665', 'Tool', 'Dismantle',
-         'You can target any player and discard one of their cards, on-hand or equipped.'),
-    Card(12, 'Q', '\u2665', 'Delay-Tool', 'Lightning',
-         'You can place this Delay-Tool on yourself. In your next turn, you will perform a judgement for this card; if it is between two and nine of \u2660 (inclusively), you recieve three units of lightning damage. If not, the Lightning passes to the next player.'),
-    Card(13, 'K', '\u2665', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(13, 'K', '\u2665', '+1 Horse', '+1 Horse',
-         'When equipped, this horse places you further away from players in distance calculations by +1.'),
-    Card(1, 'A', '\u2663', 'Tool', 'Duel', 'You can target any player for a duel with this card. If the target does not play an ATTACK, they are damaged. If they do ATTACK, then you must play one in response or take damage. Whoever does not attack, takes damage.'),
-    Card(1, 'A', '\u2663', 'Weapon', 'Zhuge Crossbow',
-         'When equipped, the wielder has no limit to the number of ATTACKs they can play in their turn.', 1),
-    Card(2, '2', '\u2663', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(2, '2', '\u2663', 'Armor', 'Black Shield',
-         'When equipped, black ATTACK cards cannot affect the wearer.'),
-    Card(2, '2', '\u2663', 'Armor', 'Eight-Trigrams',
-         'When equipped: whenever a DEFEND is needed, the wearer can perform a judgement. If it is red, the DEFEND is considered to be played.'),
-    Card(3, '3', '\u2663', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(3, '3', '\u2663', 'Tool', 'Dismantle',
-         'You can target any player and discard one of their cards, on-hand or equipped.'),
-    Card(4, '4', '\u2663', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(4, '4', '\u2663', 'Tool', 'Dismantle',
-         'You can target any player and discard one of their cards, on-hand or equipped.'),
-    Card(5, '5', '\u2663', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(5, '5', '\u2663', '+1 Horse', '+1 Horse',
-         'When equipped, this horse places you further away from players in distance calculations by +1.'),
-    Card(6, '6', '\u2663', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(6, '6', '\u2663', 'Delay-Tool', 'Acedia',
-         'You can place Delay-Tool on any other player. The target must perform a judgement for this card. If it is not \u2665, they forfeit their action-phase.'),
-    Card(7, '7', '\u2663', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(7, '7', '\u2663', 'Tool', 'Barbarians',
-         'All other players must play an ATTACK or else suffer one damage.'),
-    Card(8, '8', '\u2663', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(8, '8', '\u2663', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(9, '9', '\u2663', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(9, '9', '\u2663', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(10, '10', '\u2663', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(10, '10', '\u2663', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(11, 'J', '\u2663', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(11, 'J', '\u2663', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(12, 'Q', '\u2663', 'Tool', 'Coerce', 'Use this card to target any other player that possesses a weapon. Afterwards, you can then select any target within their attacking range. Your target can then ATTACK the victim. If they do not, you will take their weapon and add it to your hand.'),
-    Card(12, 'Q', '\u2663', 'Tool', 'Negate',
-         'Any player may play this card in response to a tool card being played. This prevents that tool card from working.'),
-    Card(13, 'K', '\u2663', 'Tool', 'Coerce', 'Use this card to target any other player that possesses a weapon. Afterwards, you can then select any target within their attacking range. Your target can then ATTACK the victim. If they do not, you will take their weapon and add it to your hand.'),
-    Card(13, 'K', '\u2663', 'Tool', 'Negate',
-         'Any player may play this card in response to a tool card being played. This prevents that tool card from working.'),
-    Card(1, 'A', '\u2666', 'Tool', 'Duel', 'You can target any player for a duel with this card. If the target does not play an ATTACK, they are damaged. If they do ATTACK, then you must play one in response or take damage. Whoever does not attack, takes damage.'),
-    Card(1, 'A', '\u2666', 'Weapon', 'Zhuge Crossbow',
-         'When equipped, the wielder has no limit to the number of ATTACKs they can play in their turn.', 1),
-    Card(2, '2', '\u2666', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(2, '2', '\u2666', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(3, '3', '\u2666', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(3, '3', '\u2666', 'Tool', 'Steal',
-         'You can use this card on a player within physical range to take a card from them (on-hand or equipped) and add it to your hand.'),
-    Card(4, '4', '\u2666', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(4, '4', '\u2666', 'Tool', 'Steal',
-         'You can use this card on a player within physical range to take a card from them (on-hand or equipped) and add it to your hand.'),
-    Card(5, '5', '\u2666', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(5, '5', '\u2666', 'Weapon', 'Axe',
-         'When equipped, and the target of the wielder DEFENDs against the ATTACK of the wielder, they can discard two cards to force the damage.', 3),
-    Card(6, '6', '\u2666', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(6, '6', '\u2666', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(7, '7', '\u2666', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(7, '7', '\u2666', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(8, '8', '\u2666', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(8, '8', '\u2666', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(9, '9', '\u2666', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(9, '9', '\u2666', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(10, '10', '\u2666', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(10, '10', '\u2666', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(11, 'J', '\u2666', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(11, 'J', '\u2666', 'Basic', 'Defend',
-         'When targeted by an ATTACK, you can play this card to avoid taking damage.'),
-    Card(12, 'Q', '\u2666', 'Basic', 'Peach',
-         'During your turn, you can use this card to recover one unit of missing health. Additionally, whenever a player is on the brink of death, any player can use a PEACH to make them recover one unit of health.'),
-    Card(12, 'Q', '\u2666', 'Tool', 'Negate',
-         'Any player may play this card in response to a tool card being played. This prevents that tool card from working.'),
-    Card(12, 'Q', '\u2666', 'Weapon', 'Sky Scorcher Halberd',
-         'When equipped and using the last on-hand card to ATTACK, the ATTACK can target an additional two players.', 4),
-    Card(13, 'K', '\u2666', 'Basic', 'Attack',
-         'Once per turn, you can use this card to attack any player within your attacking range. They must play a DEFEND or else suffer one damage.'),
-    Card(13, 'K', '\u2666', '-1 Horse', '-1 Horse',
-         'When equipped, this horse places other players closer to you in distance calculations by -1.')
-]
 
 
 # A class for handling the deck of cards in play
@@ -379,7 +418,7 @@ class Deck:
 
     def discard_from_deck(self, num=1):
         while num > 0:
-            card = self.remove_from_top()
+            card = main_deck.remove_from_top()
             discard_deck.add_to_top(card)
             num -= 1
 
@@ -534,6 +573,7 @@ class Player:
             else:
                 print(
                     f"{self.character}: You can only play one ATTACK card per turn.")
+                return False
 
         elif card.effect2 == "Red Attack":
             if (self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow()):
@@ -557,6 +597,7 @@ class Player:
             else:
                 print(
                     f"{self.character}: You can only play one ATTACK card per turn.")
+                return False
 
         elif card.effect2 == "Colourless Attack":
             if (self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow()):
@@ -580,6 +621,7 @@ class Player:
             else:
                 print(
                     f"{self.character}: You can only play one ATTACK card per turn.")
+                return False
 
         # card.ctype == 'Basic':
         elif card.effect2 == "Attack":
@@ -610,10 +652,12 @@ class Player:
             else:
                 print(
                     f"{self.character}: You can only play one ATTACK card per turn.")
+                return False
 
         elif card.effect2 == "Defend":
             print(
                 f"{self.character}: {card} can only be played as a reaction.")
+            return False
 
         elif card.effect2 == "Peach":
             if self.max_health > self.current_health:
@@ -625,6 +669,7 @@ class Player:
             else:
                 print(
                     f"{self.character}: {card} cannot currently be used on yourself as you are at full-health.")
+                return True
 
         # card.ctype == 'Tool':
         elif card.effect2 == "Barbarians":
@@ -645,7 +690,7 @@ class Player:
                                 f"{player.character} successfully defended against BARBARIANS with {barb_response}.")
                         if (barb_response.effect2 == "Black Attack") or (barb_response.effect2 == "Red Attack") or (barb_response.effect2 == "Colourless Attack"):
                             print(
-                                f"{player.character} successfully defended against BARBARIANS with an ATTACK via SERPENT SPEAR!")
+                                f"{player.character} successfully defended against BARBARIANS with a {barb_response.effect2.upper()} via SERPENT SPEAR!")
                     else:
                         print(
                             f"{player.character} failed to defend from BARBARIANS!")
@@ -657,6 +702,7 @@ class Player:
                         for item in players:
                             if item.current_health < 1:
                                 item.check_brink_of_death_loop(self)
+            return True
 
         elif card.effect2 == "Granary":
             self.hand.contents.remove(card)
@@ -677,6 +723,7 @@ class Player:
             for item in granary.hand.contents:
                 card = granary.hand.remove_from_top()
                 discard_deck.add_to_top(card)
+            return True
 
         elif card.effect2 == "Peach Gardens":
             self.hand.contents.remove(card)
@@ -692,6 +739,7 @@ class Player:
                         player.current_health += 1
                         print(
                             f"{player.character} has been healed by one. ({player.current_health}/{player.max_health} HP remaining)")
+            return True
 
         elif card.effect2 == "Rain of Arrows":
             self.hand.contents.remove(card)
@@ -720,6 +768,7 @@ class Player:
                         for item in players:
                             if item.current_health < 1:
                                 item.check_brink_of_death_loop(self)
+            return True
 
         elif card.effect2 == "Coerce":
             possible_targets = 0
@@ -751,6 +800,7 @@ class Player:
                     attacked = players[random.choice(targets)]
                     if not check_negate_loop(players, card, self, coerced):
                         coerced.activate_coerce(attacked)
+                    return True
 
         elif card.effect2 == "Dismantle":
             target = random.choice(players[1:])
@@ -774,7 +824,7 @@ class Player:
             print(f"{self.character} has played {card} against {target.character}.")
             if not check_negate_loop(players, card, self, target):
                 self.activate_duel(card, target)
-                return True
+            return True
 
         elif card.effect2 == "Greed":
             self.hand.contents.remove(card)
@@ -782,10 +832,12 @@ class Player:
             print(f"{self.character} has played {card}.")
             if not check_negate_loop(players, card, self, self):
                 self.draw(main_deck, 2)
+            return True
 
         elif card.effect2 == "Negate":
             print(
                 f"{self.character}: {card} can only be played as a reaction.")
+            return False
 
         elif card.effect2 == "Steal":
             targets = self.calculate_targets_in_physical_range()
@@ -831,9 +883,10 @@ class Player:
                 self.hand.contents.remove(card)
                 self.pending_judgements.append(card)
                 print(f"{self.character} has called {card}.")
+                return True
 
         elif card.effect2 == "Rations Depleted":
-            pass
+            return False
 
         # card.ctype == 'Equipment':
         elif card.ctype == "Weapon":
@@ -848,6 +901,7 @@ class Player:
             self.hand.contents.remove(card)
             self.equipment.append(card)
             print(f"{self.character} has equipped {card}.")
+            return True
 
         elif card.ctype == "Armor":
             armor_index = None
@@ -861,6 +915,7 @@ class Player:
             self.hand.contents.remove(card)
             self.equipment.append(card)
             print(f"{self.character} has equipped {card}.")
+            return True
 
         elif card.ctype == "-1 Horse":
             horse_index = None
@@ -874,6 +929,7 @@ class Player:
             self.hand.contents.remove(card)
             self.equipment.append(card)
             print(f"{self.character} has equipped {card}.")
+            return True
 
         elif card.ctype == "+1 Horse":
             horse_index = None
@@ -887,6 +943,7 @@ class Player:
             self.hand.contents.remove(card)
             self.equipment.append(card)
             print(f"{self.character} has equipped {card}.")
+            return True
 
     def use_reaction_effect(self, response_required, required, card, cplayer, rplayer, other_effect=None, other_card=None):
         # 'response_required' refers to what sort of reaction-effect needed, eg. ATTACK, DEFEND, PEACH, NEGATE?
@@ -991,55 +1048,6 @@ class Player:
                             return [True, negate, negated_for]
                 return [False, None]
 
-            elif response_required == "Defend" and ((card.effect2 == "Attack") or (card.effect2 == "Black Attack") or (card.effect2 == "Red Attack") or (card.effect2 == "Colourless Attack")):
-                if card.effect2 == "Attack":
-                    print(
-                        f"{self.character}: You are being attacked by {cplayer.character} using {card}; please choose a response (a DEFEND card or do nothing)!")
-                else:
-                    print(
-                        f"{self.character}: You are being attacked by {cplayer.character} using a {card.effect2.upper()}; please choose a response (a DEFEND card or do nothing)!")
-
-                defend = 0
-                while required > 0:
-
-                    armor = False
-                    for eight_trigrams in self.equipment:
-                        if eight_trigrams.effect == "Eight-Trigrams":
-                            armor = True
-                            break
-
-                    if cplayer.check_weapon_black_pommel() and armor:
-                        print(
-                            f"  >> {cplayer.character} has [Black Pommel <:2:> - 6\u2660] equipped, and therefore ignores any armor when attacking.")
-
-                    elif not cplayer.check_weapon_black_pommel():
-                        armor_check = self.check_armor_eight_trigrams()
-                        if not self.used_trigrams:
-                            self.used_trigrams = True
-                            if armor_check[0]:
-                                self.used_trigrams = False
-                                required -= 1
-                                defend = armor_check[1]
-                                defend.effect2 = "Defend"
-                                if required == 0:
-                                    return defend
-
-                    possible_cards = []
-                    for item in self.hand.contents:
-                        if item.effect == "Defend":
-                            possible_cards.append(item)
-
-                    if len(possible_cards) > 0:
-                        choices = [True, False]
-                        activated = random.choice(choices)
-                        if activated:
-                            defend = random.choice(possible_cards)
-                            self.hand.contents.remove(defend)
-                            discard_deck.add_to_top(defend)
-                    else:
-                        return defend
-                return defend
-
             elif response_required == "Attack" and card.effect2 == "Barbarians":
                 print(
                     f"{self.character}: {cplayer.character} has activated BARBARIANS; please choose a response (an ATTACK card or do nothing)!")
@@ -1131,8 +1139,10 @@ class Player:
                                     f"{self.character} played an {attack} during the duel!")
                                 required -= 1
                         else:
+                            print(f"{self.character} did not play an ATTACK!")
                             return True
                     elif len(possible_cards) < 1:
+                        print(f"{self.character} did not play an ATTACK!")
                         return True
 
                 duel_won = rplayer.use_reaction_effect(
@@ -1141,6 +1151,55 @@ class Player:
                     return False
                 else:
                     return True
+
+            elif response_required == "Defend" and ((card.effect2 == "Attack") or (card.effect2 == "Black Attack") or (card.effect2 == "Red Attack") or (card.effect2 == "Colourless Attack")):
+                if card.effect2 == "Attack":
+                    print(
+                        f"{self.character}: You are being attacked by {cplayer.character} using {card}; please choose a response (a DEFEND card or do nothing)!")
+                else:
+                    print(
+                        f"{self.character}: You are being attacked by {cplayer.character} using a {card.effect2.upper()}; please choose a response (a DEFEND card or do nothing)!")
+
+                defend = 0
+                while required > 0:
+
+                    armor = False
+                    for eight_trigrams in self.equipment:
+                        if eight_trigrams.effect == "Eight-Trigrams":
+                            armor = True
+                            break
+
+                    if cplayer.check_weapon_black_pommel() and armor:
+                        print(
+                            f"  >> {cplayer.character} has [Black Pommel <:2:> - 6\u2660] equipped, and therefore ignores any armor when attacking.")
+
+                    elif not cplayer.check_weapon_black_pommel():
+                        armor_check = self.check_armor_eight_trigrams()
+                        if not self.used_trigrams:
+                            self.used_trigrams = True
+                            if armor_check[0]:
+                                self.used_trigrams = False
+                                required -= 1
+                                defend = armor_check[1]
+                                defend.effect2 = "Defend"
+                                if required == 0:
+                                    return defend
+
+                    possible_cards = []
+                    for item in self.hand.contents:
+                        if item.effect == "Defend":
+                            possible_cards.append(item)
+
+                    if len(possible_cards) > 0:
+                        choices = [True, False]
+                        activated = random.choice(choices)
+                        if activated:
+                            defend = random.choice(possible_cards)
+                            self.hand.contents.remove(defend)
+                            discard_deck.add_to_top(defend)
+                    else:
+                        return defend
+                return defend
 
     def activate_attack(self, card, target, card2=None):
         # 'card' refers to the 'Attack' card used in Player.use_card_effect(card)
@@ -1818,13 +1877,13 @@ class Player:
                         break
 
             card = random.choice(actions)
-            print(f"Options: {actions}")
-            print(f"Selected: {card}")
+            # print(f"Options: {actions}")
+            # print(f"Selected: {card}")
 
             if card == "End Action-Phase":
                 return self.start_discard_phase()
 
-            if card == serp_spear:
+            elif card == serp_spear:
                 serp_spear = self.check_weapon_serpent_spear()
                 if serp_spear[0]:
                     self.use_card_effect(serp_spear[1], serp_spear[2])
@@ -1845,31 +1904,7 @@ class Player:
         print("----------------------------------------------------------------------------------------------------")
 
 
-# GAME-STATE
-# GAME-STATE
-# GAME-STATE
-players = generate_players(6)
-main_deck = Deck(all_cards)
-discard_deck = Deck([])
-main_deck.shuffle()
-print("The deck has been shuffled!")
-for player in players:
-    player.draw(main_deck, 4, False)
-print("All players have been dealt 4 cards!")
-game_started = True
-
-while game_started:
-    # If one player remaining...
-    if len(players) == 1:
-        game_started = False
-        print(f"{players[0]} has won the game!!!")
-        print(f"Turn number: {players[0].turn_number}!")
-    else:
-        players[0].start_beginning_phase()
-        players[0].turn_number += 1
-        # If alive at end of turn
-        if players[0].current_health > 0:
-            players.append(players.pop(0))
-        else:
-            # If dead at end of turn
-            players.pop(0)
+# --- LOOK HERE TO AUTOPLAY GAMES
+# 'num_players' = number of players per game
+# 'num_iterations' = number of iterations (entire games played till finish)
+play_games(num_players=6, num_iterations=1000)
