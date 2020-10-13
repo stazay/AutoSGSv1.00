@@ -8,10 +8,11 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 13/10/2020
-Version 1.14
+Version 1.15
 
- + 13/10/2020 (v1.14);
- - Bugfix with Eight-Trigrams seemingly checking three cards and then applying the third only...
+ + 13/10/2020 (v1.15);
+ - ...Even more... Serpent-Spear related fixes...
+ - Added/removed some print() statements...
 
  TO DO:
  - Greedy Player Mode
@@ -320,7 +321,6 @@ def check_negate_loop(given_list, card, cplayer, reacting, og_card=None):
                 print(f"{card} was negated!")
                 return True
     else:
-        print(f"{card} was activated!")
         return False
 
 
@@ -991,23 +991,6 @@ class Player:
                         possible_cards.append(item)
 
                 if len(possible_cards) > 0:
-                    if card.ctype == "Delay-Tool":
-                        print(
-                            f"{self.character}: {rplayer.character} is about to face judgement for {card} - Do you want to respond with a NEGATE?")
-                    elif card.effect2 == "Greed":
-                        print(
-                            f"{self.character}: {cplayer.character} has played {card} - Do you want to respond with a NEGATE?")
-                    elif other_card != None:
-                        if other_card.ctype == "Delay-Tool":
-                            print(
-                                f"{self.character}: {cplayer.character} has played a {card} against pending judgement: {other_card} on {rplayer.character} - Do you want to respond?")
-                        else:
-                            print(
-                                f"{self.character}: {cplayer.character} has played a {card} against the {other_card} of {rplayer.character} - Do you want to respond?")
-                    else:
-                        print(
-                            f"{self.character}: {cplayer.character} has played a {card} against {rplayer.character} - Do you want to respond?")
-
                     choices = [True, False]
                     activated = random.choice(choices)
                     if activated:
@@ -1025,8 +1008,6 @@ class Player:
                         possible_cards.append(item)
 
                 if len(possible_cards) > 0:
-                    print(
-                        f"{self.character}: {cplayer.character} has played a {card}. Do you want to respond by negating it for ANY player?")
                     choices = [True, False]
                     activated = random.choice(choices)
                     if activated:
@@ -1061,15 +1042,15 @@ class Player:
                             possible_cards.append(serp_spear)
                             break
 
-                if (len(possible_cards) > 0) or (serp_spear in possible_cards):
+                if len(possible_cards) > 0:
                     choices = [True, False]
                     activated = random.choice(choices)
                     if activated:
                         attack = random.choice(possible_cards)
                         if attack == serp_spear:
                             serp_spear = self.check_weapon_serpent_spear()
-                            if serp_spear[0]:
-                                attack = serp_spear[1]
+                            attack = serp_spear[0]
+                            required -= 1
                         else:
                             self.hand.contents.remove(attack)
                             discard_deck.add_to_top(attack)
@@ -1108,8 +1089,6 @@ class Player:
                 return defend
 
             elif response_required == "Attack" and card.effect2 == "Duel":
-                print(
-                    f"{self.character}: You having a DUEL vs {rplayer.character}; please choose a response (an ATTACK card or do nothing)!")
                 while required > 0:
                     possible_cards = []
                     for item in self.hand.contents:
@@ -1123,21 +1102,20 @@ class Player:
                                 possible_cards.append(serp_spear)
                                 break
 
-                    if (len(possible_cards) > 0) or (serp_spear in possible_cards):
+                    if (len(possible_cards) > 0):
                         choices = [True, False]
                         activated = random.choice(choices)
                         if activated:
                             attack = random.choice(possible_cards)
                             if attack == serp_spear:
                                 serp_spear = self.check_weapon_serpent_spear()
-                                if serp_spear[0]:
-                                    attack = serp_spear[1]
-                                    required -= 1
+                                attack = serp_spear[0]
+                                required -= 1
                             else:
                                 self.hand.contents.remove(attack)
                                 discard_deck.add_to_top(attack)
                                 print(
-                                    f"{self.character} played an {attack} during the duel!")
+                                    f"{self.character} played an {attack} during the DUEL!")
                                 required -= 1
                         else:
                             print(f"{self.character} did not play an ATTACK!")
@@ -1154,13 +1132,6 @@ class Player:
                     return True
 
             elif response_required == "Defend" and ((card.effect2 == "Attack") or (card.effect2 == "Black Attack") or (card.effect2 == "Red Attack") or (card.effect2 == "Colourless Attack")):
-                if card.effect2 == "Attack":
-                    print(
-                        f"{self.character}: You are being attacked by {cplayer.character} using {card}; please choose a response (a DEFEND card or do nothing)!")
-                else:
-                    print(
-                        f"{self.character}: You are being attacked by {cplayer.character} using a {card.effect2.upper()}; please choose a response (a DEFEND card or do nothing)!")
-
                 while required > 0:
                     defend = 0
 
@@ -1253,6 +1224,7 @@ class Player:
 
     def activate_coerce(self, target):
         # 'target' refers to the player that will potentially be attacked by the coerced player!
+        print(f"{self.character} is being coerced into attacking {target.character}!")
         possible_cards = []
         for item in self.hand.contents:
             if item.effect == "Attack":
@@ -1260,21 +1232,19 @@ class Player:
 
         serp_spear = None
         if (len(self.hand.contents) > 1):
-            for item in self.equipment:
-                if item.effect == "Serpent Spear":
-                    possible_cards.append(item)
-                    serp_spear = True
+            for serp_spear in self.equipment:
+                if serp_spear.effect == "Serpent Spear":
+                    possible_cards.append(serp_spear)
                     break
 
-        if (len(possible_cards) > 0) or (serp_spear == True):
+        if (len(possible_cards) > 0):
             choices = [True, False]
             activated = random.choice(choices)
             if activated:
                 card = random.choice(possible_cards)
-                if card not in self.hand.contents:
+                if card == serp_spear:
                     serp_spear = self.check_weapon_serpent_spear()
-                    if serp_spear[0]:
-                        return self.activate_attack(serp_spear[1], target, serp_spear[2])
+                    return self.activate_attack(serp_spear[0], target, serp_spear[1])
                 else:
                     self.hand.contents.remove(card)
                     discard_deck.add_to_top(card)
@@ -1300,7 +1270,7 @@ class Player:
                 self.equipment.remove(item)
                 players[0].hand.add_to_top(item)
                 print(
-                    f"{self.character}: Your weapon has been stolen by {players[0].character} for not attacking {target.character}!")
+                    f"{self.character}: Your weapon, {item}, has been stolen by {players[0].character} for not attacking {target.character}!")
                 return True
 
     def activate_dismantle(self, card, target):
@@ -1784,7 +1754,7 @@ class Player:
                 card.effect2 = "Colourless Attack"
             print(
                 f"  >> {self.character} discarded two cards ({card}/{card2} to use as an ATTACK via {self.equipment[weapon_index]}!")
-            return [True, card, card2]
+            return [card, card2]
         return [False]
 
     def check_weapon_sky_scorcher_halberd(self, target):
@@ -1892,8 +1862,7 @@ class Player:
 
             elif card == serp_spear:
                 serp_spear = self.check_weapon_serpent_spear()
-                if serp_spear[0]:
-                    self.use_card_effect(serp_spear[1], serp_spear[2])
+                self.use_card_effect(serp_spear[0], serp_spear[1])
             else:
                 card.effect2 = card.effect
                 self.use_card_effect(card)
@@ -1914,4 +1883,4 @@ class Player:
 # --- LOOK HERE TO AUTOPLAY GAMES
 # 'num_players' = number of players per game (ideally, numbers between 3-10)
 # 'num_iterations' = number of iterations (entire games played till finish)
-play_games(num_players=8, num_iterations=10000)
+play_games(num_players=8, num_iterations=1000)
