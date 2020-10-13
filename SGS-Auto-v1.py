@@ -8,10 +8,9 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 13/10/2020
-Version 1.15
+Version 1.16
 
- + 13/10/2020 (v1.15);
- - ...Even more... Serpent-Spear related fixes...
+ + 13/10/2020 (v1.16);
  - Added/removed some print() statements...
 
  TO DO:
@@ -654,8 +653,6 @@ class Player:
                 return False
 
         elif card.effect2 == "Defend":
-            print(
-                f"{self.character}: {card} can only be played as a reaction.")
             return False
 
         elif card.effect2 == "Peach":
@@ -778,8 +775,6 @@ class Player:
                             possible_targets += 1
 
             if possible_targets == 0:
-                print(
-                    f"{self.character}: There are no possible targets with weapons to target with {card}.")
                 return False
 
             elif possible_targets > 0:
@@ -805,7 +800,6 @@ class Player:
             target = random.choice(players[1:])
 
             if (len(target.hand.contents) + len(target.equipment) + len(target.pending_judgements)) < 1:
-                print(f"{target.character} has no cards that can be dismantled.")
                 return False
             else:
                 self.hand.contents.remove(card)
@@ -834,19 +828,15 @@ class Player:
             return True
 
         elif card.effect2 == "Negate":
-            print(
-                f"{self.character}: {card} can only be played as a reaction.")
             return False
 
         elif card.effect2 == "Steal":
             targets = self.calculate_targets_in_physical_range()
             if len(targets) < 1:
-                print(f"{self.character}: You can't reach anyone with {card}!")
                 return False
             target = players[random.choice(targets)]
 
             if (len(target.hand.contents) + len(target.equipment) + len(target.pending_judgements)) < 1:
-                print(f"{target.character} has no cards that can be stolen.")
                 return False
             else:
                 self.hand.contents.remove(card)
@@ -862,8 +852,6 @@ class Player:
             target = random.choice(players[1:])
             for item in target.pending_judgements:
                 if item.effect2 == 'Acedia':
-                    print(
-                        f"{target.character} is already pending judgement for ACEDIA!")
                     return False
 
             else:
@@ -875,8 +863,6 @@ class Player:
         elif card.effect2 == "Lightning":
             for item in self.pending_judgements:
                 if item.effect2 == 'Lightning':
-                    print(
-                        f"{self.character}: You cannot play a LIGHTNING when you already have one active on yourself.")
                     return False
             else:
                 self.hand.contents.remove(card)
@@ -1449,7 +1435,6 @@ class Player:
 
     def check_pending_judgements(self):
         while len(self.pending_judgements) > 0:
-            print(" ")
             pending_judgement = self.pending_judgements.pop(0)
 
             # LIGHTNING
@@ -1840,7 +1825,6 @@ class Player:
     def start_action_phase(self):
         action_phase_active = True
         while action_phase_active:
-            print(" ")
             if len(players) < 2:
                 return self.start_end_phase()
             actions = self.hand.contents + ["End Action-Phase"]
