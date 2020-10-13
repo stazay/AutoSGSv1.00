@@ -7,16 +7,15 @@
 /________// /_//|_||/_//  |___// /________// /________// /________//  /________// /_//  /_// /_//| || /_//
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
-Current Version: 12/10/2020
-Version 1.13
+Current Version: 13/10/2020
+Version 1.14
 
- + 12/10/2020 (v1.13);
- - generate_deck() function created
- - play_games(num_players, num_iterations) function created, allowing you to decide how many games you want to automatically play :D
- - Player.use_card_effect() to return True/False if pass/fail
+ + 13/10/2020 (v1.14);
+ - Bugfix with Eight-Trigrams seemingly checking three cards and then applying the third only...
 
  TO DO:
- - Greedy Player Mode  
+ - Greedy Player Mode
+ - Slowly remove print() statements
 """
 import random
 
@@ -1049,9 +1048,6 @@ class Player:
                 return [False, None]
 
             elif response_required == "Attack" and card.effect2 == "Barbarians":
-                print(
-                    f"{self.character}: {cplayer.character} has activated BARBARIANS; please choose a response (an ATTACK card or do nothing)!")
-
                 attack = 0
                 possible_cards = []
                 for item in self.hand.contents:
@@ -1081,16 +1077,21 @@ class Player:
                 return attack
 
             elif response_required == "Defend" and card.effect2 == "Rain of Arrows":
-                print(f"{self.character}: {cplayer.character} has activated RAIN OF ARROWS; please choose a response (a DEFEND card or do nothing)!")
-
                 defend = 0
-                armor_check = self.check_armor_eight_trigrams()
-                if not self.used_trigrams:
-                    self.used_trigrams = True
-                    if armor_check[0]:
-                        self.used_trigrams = False
-                        defend = armor_check[1]
-                        return defend
+
+                # Check for Eight Trigrams
+                armor = False
+                for eight_trigrams in self.equipment:
+                    if eight_trigrams.effect == "Eight-Trigrams":
+                        armor = True
+                        break
+                if armor:
+                    choices = [True, False]
+                    activated = random.choice(choices)
+                    if activated:
+                        defend = self.check_armor_eight_trigrams()
+                        if type(defend) == Card:
+                            return defend
 
                 possible_cards = []
                 for item in self.hand.contents:
@@ -1160,30 +1161,36 @@ class Player:
                     print(
                         f"{self.character}: You are being attacked by {cplayer.character} using a {card.effect2.upper()}; please choose a response (a DEFEND card or do nothing)!")
 
-                defend = 0
                 while required > 0:
+                    defend = 0
 
+                    # Check for Eight Trigrams
                     armor = False
                     for eight_trigrams in self.equipment:
                         if eight_trigrams.effect == "Eight-Trigrams":
                             armor = True
                             break
-
                     if cplayer.check_weapon_black_pommel() and armor:
                         print(
                             f"  >> {cplayer.character} has [Black Pommel <:2:> - 6\u2660] equipped, and therefore ignores any armor when attacking.")
-
-                    elif not cplayer.check_weapon_black_pommel():
-                        armor_check = self.check_armor_eight_trigrams()
-                        if not self.used_trigrams:
-                            self.used_trigrams = True
-                            if armor_check[0]:
-                                self.used_trigrams = False
+                    elif not cplayer.check_weapon_black_pommel() and armor:
+                        choices = [True, False]
+                        activated = random.choice(choices)
+                        if activated:
+                            defend = self.check_armor_eight_trigrams()
+                            if type(defend) == Card:
                                 required -= 1
-                                defend = armor_check[1]
-                                defend.effect2 = "Defend"
                                 if required == 0:
                                     return defend
+                                else:
+                                    choices = [True, False]
+                                    activated = random.choice(choices)
+                                    if activated:
+                                        defend = self.check_armor_eight_trigrams()
+                                        if type(defend) == Card:
+                                            required -= 1
+                                            if required == 0:
+                                                return defend
 
                     possible_cards = []
                     for item in self.hand.contents:
@@ -1583,6 +1590,9 @@ class Player:
         return False
 
     def check_armor_eight_trigrams(self):
+        if self.used_trigrams:
+            return False
+
         armor = False
         for item_index, item in enumerate(self.equipment):
             if item.effect == "Eight-Trigrams":
@@ -1591,21 +1601,19 @@ class Player:
                 break
 
         if armor:
-            choices = [True, False]
-            activated = random.choice(choices)
-            if activated:
-                print(
-                    f"  >> {self.character} chose to activate their equipped {self.equipment[armor_index]} (armor); needs \u2665 or \u2666 to automatically dodge.")
-                main_deck.discard_from_deck()
-                judgement_card = discard_deck.contents[0]
-                print(
-                    f"  >> Judgement: {self.character} flipped a {judgement_card}.")
-                if judgement_card.suit == "\u2665" or judgement_card.suit == "\u2666":
-                    judgement_card.effect2 = "Defend"
-                    return (True, judgement_card)
-                else:
-                    return (False, None)
-        return (False, None)
+            print(
+                f"  >> {self.character} chose to activate their equipped {self.equipment[armor_index]} (armor); needs \u2665 or \u2666 to automatically dodge.")
+            main_deck.discard_from_deck()
+            judgement_card = discard_deck.contents[0]
+            print(
+                f"  >> Judgement: {self.character} flipped a {judgement_card}.")
+            if judgement_card.suit == "\u2665" or judgement_card.suit == "\u2666":
+                judgement_card.effect2 = "Defend"
+                return judgement_card
+            else:
+                self.used_trigrams = True
+                return False
+        return False
 
     def check_weapon_axe(self, target):
         # 'target' refers to the target of the initial ATTACK card.
@@ -1628,8 +1636,6 @@ class Player:
                         discard_deck.contents.remove(card)
                         self.equipment.insert(item_index, card)
                     else:
-                        print(
-                            f"{self.character} discarded {card} by using their [Axe <:3:> - 5\u2666].")
                         cards_to_discard -= 1
                 damage_dealt = 1
                 target.current_health -= damage_dealt
@@ -1843,7 +1849,8 @@ class Player:
     # 6. "End Phase" only applies to some characters. In most cases, nothing happens here.
     def start_beginning_phase(self):
         self.reset_once_per_turn()
-        print(f"{self.character} has started their turn!")
+        print(
+            f"-----------------------------<{self.character} has started their turn!>-----------------------------")
         return self.start_judgement_phase()
 
     def start_judgement_phase(self):
@@ -1900,11 +1907,11 @@ class Player:
         return self.start_end_phase()
 
     def start_end_phase(self):
-        print(f"{self.character} has ended their turn!")
-        print("----------------------------------------------------------------------------------------------------")
+        print(
+            f"------------------------------<{self.character} has ended their turn!>------------------------------")
 
 
 # --- LOOK HERE TO AUTOPLAY GAMES
-# 'num_players' = number of players per game
+# 'num_players' = number of players per game (ideally, numbers between 3-10)
 # 'num_iterations' = number of iterations (entire games played till finish)
-play_games(num_players=6, num_iterations=1000)
+play_games(num_players=8, num_iterations=10000)
