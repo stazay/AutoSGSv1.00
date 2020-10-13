@@ -8,13 +8,12 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 13/10/2020
-Version 1.16
+Version 1.17
 
- + 13/10/2020 (v1.16);
+ + 13/10/2020 (v1.17);
  - Added/removed some print() statements...
- - Reshuffled where print() appears for COERCE
- - Fixed bug with LIGHTNING continuously checking the same player in the same turn if it cannot move
- - Fixed bug with NEGATE not correctly negating cards!
+ - Black Shield/Black Pommel-related fixes...
+ - Added "kill_rewards" within play_games(), as if every player is a rebel and awards a 3-card bounty upon death!
 
  TO DO:
  - Greedy Player Mode
@@ -256,13 +255,19 @@ def generate_deck():
     return main_deck
 
 
-def play_games(num_players, num_iterations):
+def play_games(num_players, num_iterations, kill_rewards=False):
     # 'num_players' refers to the number of players
     # 'iterations' refers to the number of iterations that the game will run
+    # 'kill_rewards' refers to giving a three-card bounty whenever a player lands a kill - False by default
     for i in range(num_iterations):
         global players
         global main_deck
         global discard_deck
+        global bounties
+        if kill_rewards:
+            bounties = True
+        else:
+            bounties = False
         players = generate_players(num_players)
         main_deck = generate_deck()
         discard_deck = Deck([])
@@ -1170,8 +1175,10 @@ class Player:
 
         # Weapon and Black Shield checks
         self.check_gender_swords(target)
+        armor = False
         if (card2 == None) or (card2.effect2 == "Black Attack"):
-            armor = target.check_armor_black_shield(card)
+            if target.check_armor_black_shield(card):
+                armor = True
             if self.check_weapon_black_pommel() and armor:
                 print(
                     f"  >> {self.character} has [Black Pommel <:2:> - 6\u2660] equipped, and therefore ignores any armor when attacking.")
@@ -1422,6 +1429,10 @@ class Player:
             print(f"{self.character} wasn't saved from the brink of death!")
             self.discard_all_cards(death=True)
             players.pop(dying_index)
+            if (bounties == True) and (source != None):
+                print(
+                    f"{source.character} draws 3 cards for killing {self.character}!")
+                source.draw(main_deck, 3, False)
             return "Break"
 
         # If player survived
@@ -1862,4 +1873,5 @@ class Player:
 # --- LOOK HERE TO AUTOPLAY GAMES
 # 'num_players' = number of players per game (ideally, numbers between 3-10)
 # 'num_iterations' = number of iterations (entire games played till finish)
-play_games(num_players=8, num_iterations=100)
+# 'kill_rewards' = toggle of whether players get rewarded for landing a kill, off by default
+play_games(num_players=8, num_iterations=100, kill_rewards=False)
