@@ -12,6 +12,9 @@ Version 1.16
 
  + 13/10/2020 (v1.16);
  - Added/removed some print() statements...
+ - Reshuffled where print() appears for COERCE
+ - Fixed bug with LIGHTNING continuously checking the same player in the same turn if it cannot move
+ - Fixed bug with NEGATE not correctly negating cards!
 
  TO DO:
  - Greedy Player Mode
@@ -264,7 +267,8 @@ def play_games(num_players, num_iterations):
         main_deck = generate_deck()
         discard_deck = Deck([])
         main_deck.shuffle()
-        print(f"Game {i}: The deck has been shuffled!")
+        print(
+            f"----------------------------------------<Game {i}: The deck has been shuffled!>----------------------------------------")
         for player in players:
             player.draw(main_deck, 4, False)
         print("All players have been dealt 4 cards!")
@@ -305,17 +309,17 @@ def check_negate_loop(given_list, card, cplayer, reacting, og_card=None):
     for player_index, player in enumerate(given_list):
         response1 = player.use_reaction_effect(
             "Negate", 1, card, cplayer, reacting)
-        if response1[0]:
+        if type(response1) == Card:
             given_list = given_list[(player_index + x):] + \
                 given_list[:(player_index + x)]
 
             for player_index2, player2 in enumerate(given_list):
                 response2 = player2.use_reaction_effect(
-                    "Negate", 1, response1[1], players[(player_index + x)], cplayer, None, card)
-                if response2[0]:
+                    "Negate", 1, response1, players[(player_index + x)], cplayer, None, card)
+                if type(response2) == Card:
                     given_list = given_list[(player_index2 + x):] + \
                         given_list[:(player_index2 + x)]
-                    return check_negate_loop(given_list, card, cplayer, reacting)
+                    return check_negate_loop(given_list, card, cplayer, reacting, og_card)
             else:
                 print(f"{card} was negated!")
                 return True
@@ -340,7 +344,7 @@ def check_aoe_negate_loop(given_list, card, cplayer, reacting, og_card=None):
             if not check_negate_loop(given_list, response1[1], players[(player_index + x)], response1[2], card):
                 response1[2].tools_immunity = True
                 print(
-                    f"{response1[2].character} will be unaffected by {og_card}!")
+                    f"{response1[2].character} will be unaffected by {og_card} - negated by {response1[3].character}!")
 
 
 # --- A class for handling playing-cards used in-game
@@ -439,7 +443,9 @@ class Hand(Deck):
 # 8. 'Equipment' refers to equipped items; only one of each type of equipment can be equipped at one time
 # 9. 'Pending_judgements' refers to any Delay-Tool cards that have yet to take effect on a player. These take effect at the start of their turn
 # 10. 'Acedia_active' refers to having failed the judgement (above), and this player misses their action-phase of their turn - False by default
-# 11. 'Tools_immunity' refers to having had a Tool-card negated for an individual player - False by default
+# 11. 'Lightning_active' refers to having not already faced judgement by Lightning in this turn - True by default
+# 12. 'Tools_immunity' refers to having had a Tool-card negated for an individual player - False by default
+# 13. 'Used_trigrams' refers to having used Eight-Trigrams to automatically produce a defend in that single action already - False by default
 class Player:
     def __init__(self, character=None, gender=None):
         self.turn_number = 1
@@ -452,6 +458,7 @@ class Player:
         self.equipment = []
         self.pending_judgements = []
         self.acedia_active = False
+        self.lightning_active = True
         self.tools_immunity = False
         self.used_trigrams = False
 
@@ -553,7 +560,6 @@ class Player:
             if (self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow()):
                 targets = self.calculate_targets_in_weapon_range()
                 if len(targets) < 1:
-                    print(f"{self.character}: You can't reach anyone with {card}!")
                     return False
                 else:
                     target = players[random.choice(targets)]
@@ -569,15 +575,12 @@ class Player:
                     self.activate_attack(card, target, card2)
                     return True
             else:
-                print(
-                    f"{self.character}: You can only play one ATTACK card per turn.")
                 return False
 
         elif card.effect2 == "Red Attack":
             if (self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow()):
                 targets = self.calculate_targets_in_weapon_range()
                 if len(targets) < 1:
-                    print(f"{self.character}: You can't reach anyone with {card}!")
                     return False
                 else:
                     target = players[random.choice(targets)]
@@ -593,15 +596,12 @@ class Player:
                     self.activate_attack(card, target, card2)
                     return True
             else:
-                print(
-                    f"{self.character}: You can only play one ATTACK card per turn.")
                 return False
 
         elif card.effect2 == "Colourless Attack":
             if (self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow()):
                 targets = self.calculate_targets_in_weapon_range()
                 if len(targets) < 1:
-                    print(f"{self.character}: You can't reach anyone with {card}!")
                     return False
                 else:
                     target = players[random.choice(targets)]
@@ -617,8 +617,6 @@ class Player:
                     self.activate_attack(card, target, card2)
                     return True
             else:
-                print(
-                    f"{self.character}: You can only play one ATTACK card per turn.")
                 return False
 
         # card.ctype == 'Basic':
@@ -626,7 +624,6 @@ class Player:
             if (self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow()):
                 targets = self.calculate_targets_in_weapon_range()
                 if len(targets) < 1:
-                    print(f"{self.character}: You can't reach anyone with {card}!")
                     return False
                 else:
                     target = players[random.choice(targets)]
@@ -648,8 +645,6 @@ class Player:
                         self.activate_attack(card, extra_targets[2])
                     return True
             else:
-                print(
-                    f"{self.character}: You can only play one ATTACK card per turn.")
                 return False
 
         elif card.effect2 == "Defend":
@@ -662,10 +657,9 @@ class Player:
                 self.current_health += 1
                 print(
                     f"{self.character} has used a PEACH to heal by one from {self.current_health -1} to {self.current_health}.")
-            else:
-                print(
-                    f"{self.character}: {card} cannot currently be used on yourself as you are at full-health.")
                 return True
+            else:
+                return False
 
         # card.ctype == 'Tool':
         elif card.effect2 == "Barbarians":
@@ -792,6 +786,8 @@ class Player:
                     self.hand.contents.remove(card)
                     discard_deck.add_to_top(card)
                     attacked = players[random.choice(targets)]
+                    print(
+                        f"{coerced.character} is being coerced into attacking {attacked.character}!")
                     if not check_negate_loop(players, card, self, coerced):
                         coerced.activate_coerce(attacked)
                     return True
@@ -983,9 +979,10 @@ class Player:
                         negate = random.choice(possible_cards)
                         self.hand.contents.remove(negate)
                         discard_deck.add_to_top(negate)
-                        [True, negate]
-
-                return [False, None]
+                        print(
+                            f"{self.character} has played a {negate} against the {card} of {cplayer.character}!")
+                        return negate
+                return False
 
             elif response_required == "AoE Negate":
                 possible_cards = []
@@ -1011,8 +1008,8 @@ class Player:
                             negate = random.choice(possible_cards)
                             self.hand.contents.remove(negate)
                             discard_deck.add_to_top(negate)
-                            return [True, negate, negated_for]
-                return [False, None]
+                            return [True, negate, negated_for, self]
+                return [False, None, None, None]
 
             elif response_required == "Attack" and card.effect2 == "Barbarians":
                 attack = 0
@@ -1210,7 +1207,6 @@ class Player:
 
     def activate_coerce(self, target):
         # 'target' refers to the player that will potentially be attacked by the coerced player!
-        print(f"{self.character} is being coerced into attacking {target.character}!")
         possible_cards = []
         for item in self.hand.contents:
             if item.effect == "Attack":
@@ -1256,7 +1252,7 @@ class Player:
                 self.equipment.remove(item)
                 players[0].hand.add_to_top(item)
                 print(
-                    f"{self.character}: Your weapon, {item}, has been stolen by {players[0].character} for not attacking {target.character}!")
+                    f"{self.character}'s weapon; {item}, has been stolen by {players[0].character} for not attacking {target.character}!")
                 return True
 
     def activate_dismantle(self, card, target):
@@ -1399,7 +1395,7 @@ class Player:
     def check_brink_of_death_loop(self, source):
         # 'source' refers to the player that is considered the source of the damage - this is relevant for attributing bounties/punishments for kills!
         if (self.max_health != 0) and (self.current_health < 1):
-            print(f"{self.character}: You are on the brink of death ({self.current_health}/{self.max_health} health), and you must be brought back to life with a PEACH or WINE.")
+            print(f"{self.character} is on the brink of death ({self.current_health}/{self.max_health} health), and must be brought back to life with a PEACH or WINE.")
             dying_index = get_player_index(self)
             reacting_index = dying_index
 
@@ -1438,8 +1434,9 @@ class Player:
             pending_judgement = self.pending_judgements.pop(0)
 
             # LIGHTNING
-            if pending_judgement.effect2 == 'Lightning':
+            if (pending_judgement.effect2 == 'Lightning') and (self.lightning_active == True):
                 move_lightning = False
+                self.lightning_active = False
                 print(
                     f"{self.character} must face judgement for LIGHTNING; (needs anything but TWO to NINE of \u2660 or else they suffer THREE points of lightning damage)! If no hit, LIGHTNING will pass onto the next player!")
                 negated = check_negate_loop(
@@ -1484,7 +1481,7 @@ class Player:
                                     players[nextp].pending_judgements.insert(
                                         0, pending_judgement)
                                     print(
-                                        f"{self.character}'s {pending_judgement} passes on to {players[nextp]}!")
+                                        f"{self.character}'s {pending_judgement} passes on to {players[nextp].character}!")
                                     possible_players = 0
                                     lightning_passed = True
                                     break
@@ -1492,7 +1489,7 @@ class Player:
                             players[nextp].pending_judgements.insert(
                                 0, pending_judgement)
                             print(
-                                f"{self.character}'s {pending_judgement} passes on to {players[nextp]}!")
+                                f"{self.character}'s {pending_judgement} passes on to {players[nextp].character}!")
                             possible_players = 0
                             lightning_passed = True
 
@@ -1520,6 +1517,8 @@ class Player:
                             f"{self.character}'s judgement card is a {judgement_card} and thus they miss their action-phase of this turn.")
                         self.acedia_active = True
                 discard_deck.add_to_top(pending_judgement)
+
+            return False
 
     def reset_once_per_turn(self):
         self.attacks_this_turn = 0
@@ -1759,8 +1758,6 @@ class Player:
             target_index1 = get_player_index(target)
             targets.remove(target_index1)
             if len(targets) < 1:
-                print(
-                    f"{self.character}: You can't reach anyone else with your ATTACK!")
                 return 0
 
             else:
@@ -1771,8 +1768,6 @@ class Player:
                 target2 = players[target_index2]
                 targets.remove(target_index2)
                 if len(targets) < 1:
-                    print(
-                        f"{self.character}: You can't reach anyone else with your ATTACK!")
                     return [True, target2]
 
                 else:
@@ -1867,4 +1862,4 @@ class Player:
 # --- LOOK HERE TO AUTOPLAY GAMES
 # 'num_players' = number of players per game (ideally, numbers between 3-10)
 # 'num_iterations' = number of iterations (entire games played till finish)
-play_games(num_players=8, num_iterations=1000)
+play_games(num_players=8, num_iterations=100)
