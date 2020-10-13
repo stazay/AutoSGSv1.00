@@ -8,14 +8,16 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 13/10/2020
-Version 1.18
+Version 1.19
 
- + 13/10/2020 (v1.18);
- - Consistency fixes with Lightning etc~
+ + 13/10/2020 (v1.19);
+ - Added an 'else' statement to Player.use_reaction_effect(), to prevent strange, endless while-loops within BARBARIANS / RAIN OF ARROWS
+ - Simplified Player.use_reaction_effect() to no longer have 3x unneeded variables in its constructor; and to calculate elsewhere instead
+ - AoE tool cards (BARBARIANS / GRANARY / PEACH GARDENS / RAIN OF ARROWS) do not get added to discard pile until resolved
+ - Negate/AoE Negate messages updated for consistency and traceability
 
  TO DO:
  - Greedy Player Mode
- - Slowly remove print() statements
 """
 import random
 
@@ -301,28 +303,28 @@ def get_player_index(target):
             return target_index
 
 
-def check_negate_loop(given_list, card, cplayer, reacting, og_card=None):
+def check_negate_loop(given_list, card, source, reacting, og_card=None):
     # 'given_list' refers to the list of players included in the negate-loop (for purposes of where it starts from)
     # 'card' refers to the card played, being potentially negated
-    # 'cplayer' refers to the player of the card played
+    # 'source' refers to the player of the card played
     # 'reacting' refers to the player reacting in this negate-loop
     # 'OG_card' refers to the FIRST card played (so Card can become negates being negated, this is the original card)
     x = 1 - len(players)
     given_list = given_list[(0 + x):] + given_list[:(0 + x)]
     for player_index, player in enumerate(given_list):
         response1 = player.use_reaction_effect(
-            "Negate", 1, card, cplayer, reacting)
+            "Negate", card, source)
         if type(response1) == Card:
             given_list = given_list[(player_index + x):] + \
                 given_list[:(player_index + x)]
 
             for player_index2, player2 in enumerate(given_list):
                 response2 = player2.use_reaction_effect(
-                    "Negate", 1, response1, players[(player_index + x)], cplayer, None, card)
+                    "Negate", response1, players[(player_index + x)], card)
                 if type(response2) == Card:
                     given_list = given_list[(player_index2 + x):] + \
                         given_list[:(player_index2 + x)]
-                    return check_negate_loop(given_list, card, cplayer, reacting, og_card)
+                    return check_negate_loop(given_list, card, source, reacting, og_card)
             else:
                 print(f"{card} was negated!")
                 return True
@@ -330,17 +332,17 @@ def check_negate_loop(given_list, card, cplayer, reacting, og_card=None):
         return False
 
 
-def check_aoe_negate_loop(given_list, card, cplayer, reacting, og_card=None):
+def check_aoe_negate_loop(given_list, card, source, reacting, og_card=None):
     # 'given_list' refers to the list of players included in the negate-loop (for purposes of where it starts from)
     # 'card' refers to the card played, being potentially negated
-    # 'cplayer' refers to the player of the card played
+    # 'source' refers to the player of the card played
     # 'reacting' refers to the player reacting in this negate-loop
     # 'OG_card' refers to the FIRST card played (so Card can become negates being negated, this is the original card)
     x = 1 - len(players)
     given_list = given_list[(0 + x):] + given_list[:(0 + x)]
     for player_index, player in enumerate(given_list):
         response1 = player.use_reaction_effect(
-            "AoE Negate", 1, card, cplayer, reacting)
+            "AoE Negate", card, source)
         if response1[0]:
             given_list = given_list[(player_index + x):] + \
                 given_list[:(player_index + x)]
@@ -439,14 +441,14 @@ class Hand(Deck):
 # 1. 'Turn_number' is a counter that will return how many turns this player has had at the end of the game.
 # 2. 'Character' is a PLACEHOLDER for future versions when character-cards are introduced! Currently you get a number only (eg. p5)
 # 3. 'Gender' is a PLACEHOLDER for future versions when character-cards are introduced! Currently you get M/F at random
-# 4. 'Attacks_this_turn' is defaultly set to 0; players can only do 1 ATTACK per turn unless a crossbow is equipped
+# 4. 'Attacks_this_turn' is defaultly set to 0; players can only do 1 ATTACK per turn unless a Zhuge Crossbow is equipped
 # 5. 'Current_health' is defaultly set to 4 (this will change in future versions); when a players' health reaches 0, they are on the BRINK OF DEATH!
 # 6. 'Max_health' is defaultly set to 4 (this will change in future versions); current_health cannot exceed max_health
 # 7. 'Hand' refers to the playing-cards in a players' hand
 # 8. 'Equipment' refers to equipped items; only one of each type of equipment can be equipped at one time
 # 9. 'Pending_judgements' refers to any Delay-Tool cards that have yet to take effect on a player. These take effect at the start of their turn
-# 10. 'Acedia_active' refers to having failed the judgement (above), and this player misses their action-phase of their turn - False by default
-# 11. 'Lightning_immunity' applies when you have already faced judgement for Lightning in this turn - False by default
+# 10. 'Acedia_active' refers to having failed the judgement (above), and missing the action-phase of this turn - False by default
+# 11. 'Lightning_immunity' applies when you have already faced judgement (above) for Lightning in this turn - False by default
 # 12. 'Tools_immunity' refers to having had a Tool-card negated for an individual player - False by default
 # 13. 'Used_trigrams' refers to having used Eight-Trigrams to automatically produce a defend in that single action already - False by default
 class Player:
@@ -507,6 +509,8 @@ class Player:
                 print(
                     f"{num} cards have been added to {self.character}'s hand.")
         while num > 0:
+            if deck == main_deck:
+                main_deck.check_if_empty()
             card = deck.remove_from_top()
             self.hand.add_to_top(card)
             num -= 1
@@ -667,7 +671,6 @@ class Player:
         # card.ctype == 'Tool':
         elif card.effect2 == "Barbarians":
             self.hand.contents.remove(card)
-            discard_deck.add_to_top(card)
             print(
                 f"{self.character} has activated {card}. All players will take one damage (unless playing ATTACK or tool-card negated).")
 
@@ -676,7 +679,7 @@ class Player:
             for player in players:
                 if (player != players[0]) and (player.current_health > 0) and (not player.tools_immunity):
                     barb_response = player.use_reaction_effect(
-                        "Attack", 1, card, self, player)
+                        "Attack", card, self)
                     if type(barb_response) == Card:
                         if (barb_response.effect == "Attack") or (barb_response.effect2 == "Attack"):
                             print(
@@ -695,11 +698,12 @@ class Player:
                         for item in players:
                             if item.current_health < 1:
                                 item.check_brink_of_death_loop(self)
+
+            discard_deck.add_to_top(card)
             return True
 
         elif card.effect2 == "Granary":
             self.hand.contents.remove(card)
-            discard_deck.add_to_top(card)
             print(f"{self.character} has activated {card}. {len(players)} cards have been flipped from the deck. Everyone takes a card; {self.character} goes first!")
 
             check_aoe_negate_loop(players, card, self, self, card)
@@ -714,13 +718,14 @@ class Player:
                     print(f"{player.character} has taken {drawn} via GRANARY!")
 
             for item in granary.hand.contents:
-                card = granary.hand.remove_from_top()
-                discard_deck.add_to_top(card)
+                discard = granary.hand.remove_from_top()
+                discard_deck.add_to_top(discard)
+
+            discard_deck.add_to_top(card)
             return True
 
         elif card.effect2 == "Peach Gardens":
             self.hand.contents.remove(card)
-            discard_deck.add_to_top(card)
             print(
                 f"{self.character} has activated {card}. All damaged players will be healed by one health (unless negated).")
 
@@ -732,11 +737,12 @@ class Player:
                         player.current_health += 1
                         print(
                             f"{player.character} has been healed by one. ({player.current_health}/{player.max_health} HP remaining)")
+
+            discard_deck.add_to_top(card)
             return True
 
         elif card.effect2 == "Rain of Arrows":
             self.hand.contents.remove(card)
-            discard_deck.add_to_top(card)
             print(
                 f"{self.character} has activated {card}. All players will take one damage (unless playing DEFEND or tool-card negated).")
 
@@ -745,7 +751,7 @@ class Player:
             for player in players:
                 if (player != players[0]) and (player.current_health > 0) and (not player.tools_immunity):
                     roa_response = player.use_reaction_effect(
-                        "Defend", 1, card, self, player)
+                        "Defend", card, self)
                     if type(roa_response) == Card:
                         if (roa_response.effect == "Defend") or (roa_response.effect2 == "Defend"):
                             print(
@@ -761,6 +767,8 @@ class Player:
                         for item in players:
                             if item.current_health < 1:
                                 item.check_brink_of_death_loop(self)
+
+            discard_deck.add_to_top(card)
             return True
 
         elif card.effect2 == "Coerce":
@@ -929,13 +937,10 @@ class Player:
             print(f"{self.character} has equipped {card}.")
             return True
 
-    def use_reaction_effect(self, response_required, required, card, cplayer, rplayer, other_effect=None, other_card=None):
+    def use_reaction_effect(self, response_required, card, source, other_card=None):
         # 'response_required' refers to what sort of reaction-effect needed, eg. ATTACK, DEFEND, PEACH, NEGATE?
-        # 'required' refers to the amount of each card required. This is a placeholder for certain character effects (Lu Bu / Dong Zhuo)
         # 'card' refers to the card played that is being 'reacted' against
-        # 'cplayer' refers to the person who played the 'card'
-        # 'rplayer' refers to the person affected by the 'card'
-        # 'other_effect' refers to any specific abilities that cause this effect (usually done by character/weapon-abilities)
+        # 'source' refers to the person who played the 'card'
         # 'other_card' refers to the original card used, typically required in reactions to reactions to reactions etc...
         output_value = 0
         for item in self.hand.contents:
@@ -943,7 +948,6 @@ class Player:
         reactions_possible = True
         while reactions_possible:
             if response_required == "Brink Of Death":
-
                 possible_cards = []
                 for item in self.hand.contents:
                     if item.effect == "Peach":
@@ -958,15 +962,17 @@ class Player:
                         discard_deck.add_to_top(peach)
                         output_value += 1
 
-                        if self == cplayer:
+                        if self == source:
                             print(
                                 f"{self.character} has healed themselves using a {peach}! ({self.current_health + output_value}/{self.max_health} HP remaining!)")
                         else:
                             print(
-                                f"{self.character} has healed {cplayer.character} using a {peach}. ({cplayer.current_health + output_value}/{cplayer.max_health} HP remaining!)")
-                            if cplayer.check_break_brink_loop(output_value):
+                                f"{self.character} has healed {source.character} using a {peach}. ({source.current_health + output_value}/{source.max_health} HP remaining!)")
+                            if source.check_break_brink_loop(output_value):
+                                reactions_possible = False
                                 return output_value
 
+                reactions_possible = False
                 return output_value
 
             elif response_required == "Negate":
@@ -983,7 +989,7 @@ class Player:
                         self.hand.contents.remove(negate)
                         discard_deck.add_to_top(negate)
                         print(
-                            f"{self.character} has played a {negate} against the {card} of {cplayer.character}!")
+                            f"{self.character} has played a {negate} against the {card} of {source.character}!")
                         return negate
                 return False
 
@@ -1011,6 +1017,8 @@ class Player:
                             negate = random.choice(possible_cards)
                             self.hand.contents.remove(negate)
                             discard_deck.add_to_top(negate)
+                            print(
+                                f"{self.character} played a {negate} against the effects of {card.effect2.upper()} on {negated_for.character}!")
                             return [True, negate, negated_for, self]
                 return [False, None, None, None]
 
@@ -1036,7 +1044,6 @@ class Player:
                         if attack == serp_spear:
                             serp_spear = self.check_weapon_serpent_spear()
                             attack = serp_spear[0]
-                            required -= 1
                         else:
                             self.hand.contents.remove(attack)
                             discard_deck.add_to_top(attack)
@@ -1075,6 +1082,7 @@ class Player:
                 return defend
 
             elif response_required == "Attack" and card.effect2 == "Duel":
+                required = 1
                 while required > 0:
                     possible_cards = []
                     for item in self.hand.contents:
@@ -1110,14 +1118,15 @@ class Player:
                         print(f"{self.character} did not play an ATTACK!")
                         return True
 
-                duel_won = rplayer.use_reaction_effect(
-                    "Attack", 1, card, rplayer, cplayer)
+                duel_won = source.use_reaction_effect(
+                    "Attack", card, self)
                 if duel_won:
                     return False
                 else:
                     return True
 
             elif response_required == "Defend" and ((card.effect2 == "Attack") or (card.effect2 == "Black Attack") or (card.effect2 == "Red Attack") or (card.effect2 == "Colourless Attack")):
+                required = 1
                 while required > 0:
                     defend = 0
 
@@ -1127,10 +1136,10 @@ class Player:
                         if eight_trigrams.effect == "Eight-Trigrams":
                             armor = True
                             break
-                    if cplayer.check_weapon_black_pommel() and armor:
+                    if source.check_weapon_black_pommel() and armor:
                         print(
-                            f"  >> {cplayer.character} has [Black Pommel <:2:> - 6\u2660] equipped, and therefore ignores any armor when attacking.")
-                    elif not cplayer.check_weapon_black_pommel() and armor:
+                            f"  >> {source.character} has [Black Pommel <:2:> - 6\u2660] equipped, and therefore ignores any armor when attacking.")
+                    elif not source.check_weapon_black_pommel() and armor:
                         choices = [True, False]
                         activated = random.choice(choices)
                         if activated:
@@ -1165,6 +1174,10 @@ class Player:
                         return defend
                 return defend
 
+            else:
+                print(f"Something strange happened to {self.character} here!")
+                return False
+
     def activate_attack(self, card, target, card2=None):
         # 'card' refers to the 'Attack' card used in Player.use_card_effect(card)
         # 'target' refers to the player targeted by Attack!
@@ -1184,9 +1197,8 @@ class Player:
                 return False
 
         # Check for DEFEND
-        defend_required = 1
         attack_defended = target.use_reaction_effect(
-            "Defend", defend_required, card, self, target)
+            "Defend", card, self)
         if type(attack_defended) == Card:
             if (attack_defended.effect == "Defend") or (attack_defended.effect2 == "Defend"):
                 print(
@@ -1289,7 +1301,7 @@ class Player:
         # 'card' refers to the 'Duel' card used in Player.use_card_effect(card)
         # 'target' refers to the player targeted by Duel!
         # 'duel_won' is a boolean that determines the winner of the duel
-        duel_won = target.use_reaction_effect("Attack", 1, card, target, self)
+        duel_won = target.use_reaction_effect("Attack", card, self)
         damage_dealt = 1
 
         if duel_won:
@@ -1409,7 +1421,7 @@ class Player:
             if self.current_health > 0:
                 break
             self.current_health += player.use_reaction_effect(
-                "Brink Of Death", 1, None, self, player)
+                "Brink Of Death", None, self)
             reacting_index += 1
             if reacting_index >= len(players):
                 reacting_index -= len(players)
@@ -1417,7 +1429,7 @@ class Player:
             if self.current_health > 0:
                 break
             self.current_health += player.use_reaction_effect(
-                "Brink Of Death", 1, None, self, player)
+                "Brink Of Death", None, self)
             reacting_index += 1
             if reacting_index >= len(players):
                 reacting_index -= len(players)
@@ -1872,5 +1884,5 @@ class Player:
 # --- LOOK HERE TO AUTOPLAY GAMES
 # 'num_players' = number of players per game (ideally, numbers between 3-10)
 # 'num_iterations' = number of iterations (entire games played till finish)
-# 'kill_rewards' = toggle of whether players get rewarded for landing a kill, off by default
-play_games(num_players=8, num_iterations=100, kill_rewards=False)
+# 'kill_rewards' = toggle of whether players get rewarded for landing a kill (False by default)
+play_games(num_players=8, num_iterations=40000, kill_rewards=True)
