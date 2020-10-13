@@ -8,12 +8,10 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 13/10/2020
-Version 1.17
+Version 1.18
 
- + 13/10/2020 (v1.17);
- - Added/removed some print() statements...
- - Black Shield/Black Pommel-related fixes...
- - Added "kill_rewards" within play_games(), as if every player is a rebel and awards a 3-card bounty upon death!
+ + 13/10/2020 (v1.18);
+ - Consistency fixes with Lightning etc~
 
  TO DO:
  - Greedy Player Mode
@@ -448,7 +446,7 @@ class Hand(Deck):
 # 8. 'Equipment' refers to equipped items; only one of each type of equipment can be equipped at one time
 # 9. 'Pending_judgements' refers to any Delay-Tool cards that have yet to take effect on a player. These take effect at the start of their turn
 # 10. 'Acedia_active' refers to having failed the judgement (above), and this player misses their action-phase of their turn - False by default
-# 11. 'Lightning_active' refers to having not already faced judgement by Lightning in this turn - True by default
+# 11. 'Lightning_immunity' applies when you have already faced judgement for Lightning in this turn - False by default
 # 12. 'Tools_immunity' refers to having had a Tool-card negated for an individual player - False by default
 # 13. 'Used_trigrams' refers to having used Eight-Trigrams to automatically produce a defend in that single action already - False by default
 class Player:
@@ -463,7 +461,7 @@ class Player:
         self.equipment = []
         self.pending_judgements = []
         self.acedia_active = False
-        self.lightning_active = True
+        self.lightning_immunity = False
         self.tools_immunity = False
         self.used_trigrams = False
 
@@ -1445,9 +1443,9 @@ class Player:
             pending_judgement = self.pending_judgements.pop(0)
 
             # LIGHTNING
-            if (pending_judgement.effect2 == 'Lightning') and (self.lightning_active == True):
+            if (pending_judgement.effect2 == 'Lightning') and (self.lightning_immunity == False):
                 move_lightning = False
-                self.lightning_active = False
+                self.lightning_immunity = True
                 print(
                     f"{self.character} must face judgement for LIGHTNING; (needs anything but TWO to NINE of \u2660 or else they suffer THREE points of lightning damage)! If no hit, LIGHTNING will pass onto the next player!")
                 negated = check_negate_loop(
@@ -1534,6 +1532,7 @@ class Player:
     def reset_once_per_turn(self):
         self.attacks_this_turn = 0
         self.acedia_active = False
+        self.lightning_immunity = True
         self.tools_immunity = False
         self.used_trigrams = False
 
