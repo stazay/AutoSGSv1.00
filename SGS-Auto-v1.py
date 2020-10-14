@@ -7,17 +7,16 @@
 /________// /_//|_||/_//  |___// /________// /________// /________//  /________// /_//  /_// /_//| || /_//
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
-Current Version: 13/10/2020
-Version 1.19
+Current Version: 14/10/2020
+Version 1.20
 
- + 13/10/2020 (v1.19);
- - Added an 'else' statement to Player.use_reaction_effect(), to prevent strange, endless while-loops within BARBARIANS / RAIN OF ARROWS
- - Simplified Player.use_reaction_effect() to no longer have 3x unneeded variables in its constructor; and to calculate elsewhere instead
- - AoE tool cards (BARBARIANS / GRANARY / PEACH GARDENS / RAIN OF ARROWS) do not get added to discard pile until resolved
- - Negate/AoE Negate messages updated for consistency and traceability
+ + 14/10/2020 (v1.20);
+ - Lightning-related bugfixes
+ - Lightning damage can now be altered for testing purposes (from 0-3, 3 by default)
 
  TO DO:
  - Greedy Player Mode
+ - CSV stuff...
 """
 import random
 
@@ -255,15 +254,22 @@ def generate_deck():
     return main_deck
 
 
-def play_games(num_players, num_iterations, kill_rewards=False):
+def play_games(num_players, num_iterations, lightning=3, kill_rewards=False):
     # 'num_players' refers to the number of players
     # 'iterations' refers to the number of iterations that the game will run
+    # 'lightning' refers to the amount of damage a player takes when hit by lightning - 3 by default
     # 'kill_rewards' refers to giving a three-card bounty whenever a player lands a kill - False by default
     for i in range(num_iterations):
+        global lightning_damage
+        global bounties
         global players
         global main_deck
         global discard_deck
-        global bounties
+        if lightning > 3:
+            lightning = 3
+        if lightning < 0:
+            lightning = 0
+        lightning_damage = lightning
         if kill_rewards:
             bounties = True
         else:
@@ -1459,7 +1465,7 @@ class Player:
                 move_lightning = False
                 self.lightning_immunity = True
                 print(
-                    f"{self.character} must face judgement for LIGHTNING; (needs anything but TWO to NINE of \u2660 or else they suffer THREE points of lightning damage)! If no hit, LIGHTNING will pass onto the next player!")
+                    f"{self.character} must face judgement for LIGHTNING; (needs anything but TWO to NINE of \u2660 or else they suffer {lightning_damage} points of lightning damage)! If no hit, LIGHTNING will pass onto the next player!")
                 negated = check_negate_loop(
                     players, pending_judgement, self, self)
                 if negated:
@@ -1473,9 +1479,9 @@ class Player:
                     # IF JUDGEMENT OCCURS AND HITS PLAYER!
                     if (judgement_card.suit == "\u2660") and (10 > judgement_card.rank > 1):
                         print(
-                            f"{self.character}'s judgement card is a {judgement_card} and therefore {pending_judgement} deals 3 DAMAGE, then gets discarded!")
+                            f"{self.character}'s judgement card is a {judgement_card} and therefore {pending_judgement} deals {lightning_damage} damage, then gets discarded!")
                         discard_deck.add_to_top(pending_judgement)
-                        damage_dealt = 3
+                        damage_dealt = lightning_damage
                         self.current_health -= damage_dealt
                         if self.current_health < 1:
                             if self.check_brink_of_death_loop(None) == "Break":
@@ -1544,7 +1550,7 @@ class Player:
     def reset_once_per_turn(self):
         self.attacks_this_turn = 0
         self.acedia_active = False
-        self.lightning_immunity = True
+        self.lightning_immunity = False
         self.tools_immunity = False
         self.used_trigrams = False
 
@@ -1882,7 +1888,8 @@ class Player:
 
 
 # --- LOOK HERE TO AUTOPLAY GAMES
-# 'num_players' = number of players per game (ideally, numbers between 3-10)
-# 'num_iterations' = number of iterations (entire games played till finish)
-# 'kill_rewards' = toggle of whether players get rewarded for landing a kill (False by default)
-play_games(num_players=8, num_iterations=40000, kill_rewards=True)
+# 'num_players' refers to the number of players
+# 'iterations' refers to the number of iterations that the game will run
+# 'lightning' refers to the amount of damage a player takes when hit by lightning - 3 by default
+# 'kill_rewards' refers to giving a three-card bounty whenever a player lands a kill - False by default
+play_games(num_players=8, num_iterations=1, lightning=3, kill_rewards=True)
