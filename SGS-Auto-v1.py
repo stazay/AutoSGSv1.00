@@ -8,11 +8,10 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 14/10/2020
-Version 1.20
+Version 1.21
 
- + 14/10/2020 (v1.20);
- - Lightning-related bugfixes
- - Lightning damage can now be altered for testing purposes (from 0-3, 3 by default)
+ + 14/10/2020 (v1.21);
+ - Pending-judgement-related fixes
 
  TO DO:
  - Greedy Player Mode
@@ -710,7 +709,7 @@ class Player:
 
         elif card.effect2 == "Granary":
             self.hand.contents.remove(card)
-            print(f"{self.character} has activated {card}. {len(players)} cards have been flipped from the deck. Everyone takes a card; {self.character} goes first!")
+            print(f"{self.character} has activated {card}. {len(players)} cards have been flipped from the deck. Everyone (unless negated) takes a card; {self.character} goes first!")
 
             check_aoe_negate_loop(players, card, self, self, card)
 
@@ -869,7 +868,7 @@ class Player:
 
             else:
                 self.hand.contents.remove(card)
-                target.pending_judgements.append(card)
+                target.pending_judgements.insert(0, card)
                 print(f"{self.character} has placed {card} on {target.character}!")
                 return True
 
@@ -879,7 +878,7 @@ class Player:
                     return False
             else:
                 self.hand.contents.remove(card)
-                self.pending_judgements.append(card)
+                self.pending_judgements.insert(0, card)
                 print(f"{self.character} has called {card}.")
                 return True
 
@@ -1460,8 +1459,26 @@ class Player:
         while len(self.pending_judgements) > 0:
             pending_judgement = self.pending_judgements.pop(0)
 
+            # ACEDIA
+            if pending_judgement.effect2 == 'Acedia':
+                if not check_negate_loop(players, pending_judgement, self, self):
+                    print(
+                        f"{self.character} must face judgement for ACEDIA; (needs \u2665 to pass, or else misses action-phase of turn).")
+                    main_deck.discard_from_deck()
+                    judgement_card = discard_deck.contents[0]
+                    print(
+                        f"  >> Judgement: {self.character} flipped a {judgement_card}.")
+                    if judgement_card.suit == "\u2665":
+                        print(
+                            f"{self.character}'s judgement card is a {judgement_card} and therefore {pending_judgement} has no effect.")
+                    else:
+                        print(
+                            f"{self.character}'s judgement card is a {judgement_card} and thus they miss their action-phase of this turn.")
+                        self.acedia_active = True
+                discard_deck.add_to_top(pending_judgement)
+
             # LIGHTNING
-            if (pending_judgement.effect2 == 'Lightning') and (self.lightning_immunity == False):
+            elif (pending_judgement.effect2 == 'Lightning') and (self.lightning_immunity == False):
                 move_lightning = False
                 self.lightning_immunity = True
                 print(
@@ -1524,28 +1541,12 @@ class Player:
                     if not lightning_passed:
                         print(
                             f"{self.character}: There is no next player; {pending_judgement} stays put!")
-                        self.pending_judgements.insert(
-                            0, pending_judgement)
+                        self.pending_judgements.append(pending_judgement)
 
-            # ACEDIA
-            if pending_judgement.effect2 == 'Acedia':
-                if not check_negate_loop(players, pending_judgement, self, self):
-                    print(
-                        f"{self.character} must face judgement for ACEDIA; (needs \u2665 to pass, or else misses action-phase of turn).")
-                    main_deck.discard_from_deck()
-                    judgement_card = discard_deck.contents[0]
-                    print(
-                        f"  >> Judgement: {self.character} flipped a {judgement_card}.")
-                    if judgement_card.suit == "\u2665":
-                        print(
-                            f"{self.character}'s judgement card is a {judgement_card} and therefore {pending_judgement} has no effect.")
-                    else:
-                        print(
-                            f"{self.character}'s judgement card is a {judgement_card} and thus they miss their action-phase of this turn.")
-                        self.acedia_active = True
-                discard_deck.add_to_top(pending_judgement)
-
-            return False
+            # No more pending_judgements!
+            elif (pending_judgement.effect2 == 'Lightning') and (self.lightning_immunity == True):
+                self.pending_judgements.append(pending_judgement)
+                return False
 
     def reset_once_per_turn(self):
         self.attacks_this_turn = 0
@@ -1892,4 +1893,4 @@ class Player:
 # 'iterations' refers to the number of iterations that the game will run
 # 'lightning' refers to the amount of damage a player takes when hit by lightning - 3 by default
 # 'kill_rewards' refers to giving a three-card bounty whenever a player lands a kill - False by default
-play_games(num_players=8, num_iterations=1, lightning=3, kill_rewards=True)
+play_games(num_players=8, num_iterations=2000, lightning=3, kill_rewards=True)
