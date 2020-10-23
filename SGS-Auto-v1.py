@@ -7,11 +7,13 @@
 /________// /_//|_||/_//  |___// /________// /________// /________//  /________// /_//  /_// /_//| || /_//
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
-Current Version: 14/10/2020
-Version 1.21
+Current Version: 23/10/2020
+Version 1.22
 
- + 14/10/2020 (v1.21);
- - Pending-judgement-related fixes
+ + 23/10/2020 (v1.22);
+ - Was very sick for the last week :(
+ - Implemented roles, and removed role-rewards mode. Everyone is now considered a rebel if roles == False!
+ - Minor print() statement updates
 
  TO DO:
  - Greedy Player Mode
@@ -21,18 +23,40 @@ import random
 
 
 # --- Game-Setup
-def generate_players(num):
+def generate_players(num, roles):
     # 'num' refers to the number of players you want to generate
+    # 'roles' refers to whether the players will be generated with roles (for win-conditions) or not
+    global roles_dict
+
     if num > 10:
         num = 10
     if 3 > num:
         num = 3
+
     char_names = ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"]
     genders = ["Male", "Male", "Male", "Male", "Male",
                "Female", "Female", "Female", "Female", "Female"]
     random.shuffle(genders)
-    players = [Player(char_names.pop(0), genders.pop(0))
-               for player_number in range(num)]
+
+    if roles:
+        roles_dict = generate_roles(num)
+        roles_list = []
+        for key in roles_dict.keys():
+            for item in range(0, roles_dict[key]):
+                roles_list.append(key)
+
+        random.shuffle(roles_list)
+        roles_list.append(roles_list.pop(roles_list.index("Emperor")))
+
+        players = [Player(genders.pop(0), roles_list.pop())
+                   for player_number in range(num)]
+
+    else:
+        players = [Player(genders.pop(0)) for player_number in range(num)]
+
+    for player in players:
+        player.character = char_names.pop(0)
+
     return players
 
 
@@ -253,30 +277,78 @@ def generate_deck():
     return main_deck
 
 
-def play_games(num_players, num_iterations, lightning=3, kill_rewards=False):
+def generate_roles(num):
+    # 'num' refers to the number of players you want to generate
+    if num == 3:
+        roles_dict = {"Emperor": 1, "Advisor": 0, "Rebel": 1, "Spy": 1}
+    elif num == 4:
+        roles_dict = {"Emperor": 1, "Advisor": 1, "Rebel": 1, "Spy": 1}
+    elif num == 5:
+        roles_dict = {"Emperor": 1, "Advisor": 1, "Rebel": 2, "Spy": 1}
+    elif num == 6:
+        roles_dict = {"Emperor": 1, "Advisor": 1, "Rebel": 3, "Spy": 1}
+    elif num == 7:
+        roles_dict = {"Emperor": 1, "Advisor": 2, "Rebel": 3, "Spy": 1}
+    elif num == 8:
+        roles_dict = {"Emperor": 1, "Advisor": 2, "Rebel": 4, "Spy": 1}
+    elif num == 9:
+        roles_dict = {"Emperor": 1, "Advisor": 3, "Rebel": 4, "Spy": 1}
+    else:
+        roles_dict = {"Emperor": 1, "Advisor": 3, "Rebel": 4, "Spy": 2}
+
+    return roles_dict
+
+
+def check_win_conditions():
+    if roles_dict["Emperor"] == 1 and roles_dict["Rebel"] == 0 and roles_dict["Spy"] == 0:
+        return True
+
+    elif roles_dict["Spy"] == 1 and roles_dict["Emperor"] == 0 and roles_dict["Advisor"] == 0 and roles_dict["Rebel"] == 0:
+        return True
+
+    elif roles_dict["Emperor"] == 0:
+        return True
+
+    else:
+        return False
+
+
+def play_games(num_players, num_iterations, lightning_dmg=3, roles=True):
     # 'num_players' refers to the number of players
     # 'iterations' refers to the number of iterations that the game will run
-    # 'lightning' refers to the amount of damage a player takes when hit by lightning - 3 by default
-    # 'kill_rewards' refers to giving a three-card bounty whenever a player lands a kill - False by default
+    # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning - 3 by default
+    # 'roles' refers to whether there are any player roles in-game - True by default (if False: all players will be considered rebels)
     for i in range(num_iterations):
         global lightning_damage
-        global bounties
         global players
+        global win_conditions
         global main_deck
         global discard_deck
-        if lightning > 3:
-            lightning = 3
-        if lightning < 0:
-            lightning = 0
-        lightning_damage = lightning
-        if kill_rewards:
-            bounties = True
+
+        if lightning_dmg > 3:
+            lightning_dmg = 3
+        if lightning_dmg < 0:
+            lightning_dmg = 0
+        lightning_damage = lightning_dmg
+
+        players = generate_players(num_players, roles)
+
+        if roles:
+            win_conditions = "Roles"
+            emp_and_co = []
+            rebels = []
+            for player in players:
+                if player.role == "Emperor" or player.role == "Advisor":
+                    emp_and_co.append(player)
+                elif player.role == "Rebel":
+                    rebels.append(player)
         else:
-            bounties = False
-        players = generate_players(num_players)
+            win_conditions = "Survival"
+
         main_deck = generate_deck()
         discard_deck = Deck([])
         main_deck.shuffle()
+
         print(
             f"----------------------------------------<Game {i}: The deck has been shuffled!>----------------------------------------")
         for player in players:
@@ -284,11 +356,35 @@ def play_games(num_players, num_iterations, lightning=3, kill_rewards=False):
         print("All players have been dealt 4 cards!")
         game_started = True
         while game_started:
-            # If one player remaining...
-            if len(players) == 1:
+            if roles and check_win_conditions():
+                game_started = False
+
+                if roles_dict["Emperor"] == 1 and roles_dict["Rebel"] == 0 and roles_dict["Spy"] == 0:
+                    print(
+                        "----------------------------<Emperor and Advisor(s) win!>-----------------------------")
+                    for player in emp_and_co:
+                        print(f"{player} - {player.role}")
+
+                elif roles_dict["Spy"] == 1 and roles_dict["Emperor"] == 0 and roles_dict["Advisor"] == 0 and roles_dict["Rebel"] == 0:
+                    print(
+                        "-------------------------------------<Spy wins!>--------------------------------------")
+                    for player in players:
+                        if player.role == "Spy":
+                            print(f"{player} - {player.role}")
+
+                elif roles_dict["Emperor"] == 0:
+                    print(
+                        "------------------------------------<Rebels win!>-------------------------------------")
+                    for player in rebels:
+                        print(f"{player} - {player.role}")
+
+                print(f"Turn number: {players[0].turn_number}!")
+
+            elif len(players) == 1:
                 game_started = False
                 print(f"{players[0]} has won the game!!!")
                 print(f"Turn number: {players[0].turn_number}!")
+
             else:
                 players[0].start_beginning_phase()
                 players[0].turn_number += 1
@@ -444,23 +540,25 @@ class Hand(Deck):
 
 # --- A class for individual players and their stats in the game
 # 1. 'Turn_number' is a counter that will return how many turns this player has had at the end of the game.
-# 2. 'Character' is a PLACEHOLDER for future versions when character-cards are introduced! Currently you get a number only (eg. p5)
-# 3. 'Gender' is a PLACEHOLDER for future versions when character-cards are introduced! Currently you get M/F at random
-# 4. 'Attacks_this_turn' is defaultly set to 0; players can only do 1 ATTACK per turn unless a Zhuge Crossbow is equipped
-# 5. 'Current_health' is defaultly set to 4 (this will change in future versions); when a players' health reaches 0, they are on the BRINK OF DEATH!
-# 6. 'Max_health' is defaultly set to 4 (this will change in future versions); current_health cannot exceed max_health
-# 7. 'Hand' refers to the playing-cards in a players' hand
-# 8. 'Equipment' refers to equipped items; only one of each type of equipment can be equipped at one time
-# 9. 'Pending_judgements' refers to any Delay-Tool cards that have yet to take effect on a player. These take effect at the start of their turn
-# 10. 'Acedia_active' refers to having failed the judgement (above), and missing the action-phase of this turn - False by default
-# 11. 'Lightning_immunity' applies when you have already faced judgement (above) for Lightning in this turn - False by default
-# 12. 'Tools_immunity' refers to having had a Tool-card negated for an individual player - False by default
-# 13. 'Used_trigrams' refers to having used Eight-Trigrams to automatically produce a defend in that single action already - False by default
+# 2. 'Gender' is a PLACEHOLDER for future versions when character-cards are introduced! Currently you get Male/Female at random
+# 3. 'Role' is the secret win-condition assigned to each player: Emperor, Advisor, Rebel, Spy
+# 4. 'Character' is a PLACEHOLDER for future versions when character-cards are introduced! Currently you get a number only (eg. p5)
+# 5. 'Attacks_this_turn' is defaultly set to 0; players can only do 1 ATTACK per turn unless a Zhuge Crossbow is equipped
+# 6. 'Current_health' is defaultly set to 4 (this will change in future versions); when a players' health reaches 0, they are on the BRINK OF DEATH!
+# 7. 'Max_health' is defaultly set to 4 (this will change in future versions); current_health cannot exceed max_health
+# 8. 'Hand' refers to the playing-cards in a players' hand
+# 9. 'Equipment' refers to equipped items; only one of each type of equipment can be equipped at one time
+# 10. 'Pending_judgements' refers to any Delay-Tool cards that have yet to take effect on a player. These take effect at the start of their turn
+# 11. 'Acedia_active' refers to having failed the judgement (above), and missing the action-phase of this turn - False by default
+# 12. 'Lightning_immunity' applies when you have already faced judgement (above) for Lightning in this turn - False by default
+# 13. 'Tools_immunity' refers to having had a Tool-card negated for an individual player - False by default
+# 14. 'Used_trigrams' refers to having used Eight-Trigrams to automatically produce a defend in that single action already - False by default
 class Player:
-    def __init__(self, character=None, gender=None):
+    def __init__(self, gender=None, role="Rebel", character=None):
         self.turn_number = 1
-        self.character = character
         self.gender = gender
+        self.role = role
+        self.character = character
         self.attacks_this_turn = 0
         self.current_health = 4
         self.max_health = 4
@@ -950,6 +1048,8 @@ class Player:
         output_value = 0
         for item in self.hand.contents:
             item.effect2 = None
+        for item in self.equipment:
+            item.effect2 = None
         reactions_possible = True
         while reactions_possible:
             if response_required == "Brink Of Death":
@@ -993,8 +1093,12 @@ class Player:
                         negate = random.choice(possible_cards)
                         self.hand.contents.remove(negate)
                         discard_deck.add_to_top(negate)
-                        print(
-                            f"{self.character} has played a {negate} against the {card} of {source.character}!")
+                        if card.ctype == "Delay-Tool":
+                            print(
+                                f"{self.character} has played a {negate} against the pending {card} on {source.character}!")
+                        else:
+                            print(
+                                f"{self.character} has played a {negate} against the {card} of {source.character}!")
                         return negate
                 return False
 
@@ -1444,10 +1548,19 @@ class Player:
             print(f"{self.character} wasn't saved from the brink of death!")
             self.discard_all_cards(death=True)
             players.pop(dying_index)
-            if (bounties == True) and (source != None):
-                print(
-                    f"{source.character} draws 3 cards for killing {self.character}!")
-                source.draw(main_deck, 3, False)
+            if win_conditions == "Roles":
+                roles_dict[self.role] -= 1
+
+            if source != None:
+                if (self.role == "Rebel"):
+                    print(
+                        f"{source.character} draws 3 cards for killing {self.character}!")
+                    source.draw(main_deck, 3, False)
+                if (self.role == "Advisor") and (source.role == "Emperor"):
+                    print(
+                        f"{source.character} loses all their cards for killing their Advisor ({self.character}).")
+                    source.discard_all_cards()
+
             return "Break"
 
         # If player survived
@@ -1470,10 +1583,10 @@ class Player:
                         f"  >> Judgement: {self.character} flipped a {judgement_card}.")
                     if judgement_card.suit == "\u2665":
                         print(
-                            f"{self.character}'s judgement card is a {judgement_card} and therefore {pending_judgement} has no effect.")
+                            f"{self.character}'s judgement card is a {judgement_card}, and therefore {pending_judgement} has no effect.")
                     else:
                         print(
-                            f"{self.character}'s judgement card is a {judgement_card} and thus they miss their action-phase of this turn.")
+                            f"{self.character}'s judgement card is a {judgement_card}, and thus they miss their action-phase of this turn.")
                         self.acedia_active = True
                 discard_deck.add_to_top(pending_judgement)
 
@@ -1482,7 +1595,7 @@ class Player:
                 move_lightning = False
                 self.lightning_immunity = True
                 print(
-                    f"{self.character} must face judgement for LIGHTNING; (needs anything but TWO to NINE of \u2660 or else they suffer {lightning_damage} points of lightning damage)! If no hit, LIGHTNING will pass onto the next player!")
+                    f"{self.character} must face judgement for LIGHTNING; (needs anything but TWO to NINE of \u2660, or else they suffer {lightning_damage} points of lightning damage)! If no hit, LIGHTNING will pass onto the next player!")
                 negated = check_negate_loop(
                     players, pending_judgement, self, self)
                 if negated:
@@ -1496,7 +1609,7 @@ class Player:
                     # IF JUDGEMENT OCCURS AND HITS PLAYER!
                     if (judgement_card.suit == "\u2660") and (10 > judgement_card.rank > 1):
                         print(
-                            f"{self.character}'s judgement card is a {judgement_card} and therefore {pending_judgement} deals {lightning_damage} damage, then gets discarded!")
+                            f"{self.character}'s judgement card is a {judgement_card}, and therefore {pending_judgement} deals {lightning_damage} damage, then gets discarded!")
                         discard_deck.add_to_top(pending_judgement)
                         damage_dealt = lightning_damage
                         self.current_health -= damage_dealt
@@ -1505,7 +1618,7 @@ class Player:
                                 return "Break"
                     else:
                         print(
-                            f"{self.character}'s judgement card is a {judgement_card} and therefore {pending_judgement} passes on to the next player!")
+                            f"{self.character}'s judgement card is a {judgement_card}, and therefore {pending_judgement} passes on to the next player!")
                         move_lightning = True
 
                 # JUDGEMENT NEGATED OR OCCURS AND DOESN'T HIT!
@@ -1849,8 +1962,13 @@ class Player:
     def start_action_phase(self):
         action_phase_active = True
         while action_phase_active:
-            if len(players) < 2:
+            if win_conditions == "Roles":
+                if check_win_conditions():
+                    return self.start_end_phase()
+
+            elif len(players) < 2:
                 return self.start_end_phase()
+
             actions = self.hand.contents + ["End Action-Phase"]
 
             # Serpent Spear Check
@@ -1891,6 +2009,6 @@ class Player:
 # --- LOOK HERE TO AUTOPLAY GAMES
 # 'num_players' refers to the number of players
 # 'iterations' refers to the number of iterations that the game will run
-# 'lightning' refers to the amount of damage a player takes when hit by lightning - 3 by default
-# 'kill_rewards' refers to giving a three-card bounty whenever a player lands a kill - False by default
-play_games(num_players=8, num_iterations=2000, lightning=3, kill_rewards=True)
+# 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning - 3 by default
+# 'roles' refers to whether there are any player roles in-game - True by default (if False: all players will be considered rebels)
+play_games(num_players=8, num_iterations=1000, lightning_dmg=3, roles=False)
