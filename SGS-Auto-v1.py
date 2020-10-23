@@ -8,12 +8,11 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 23/10/2020
-Version 1.22
+Version 1.23
 
- + 23/10/2020 (v1.22);
+ + 23/10/2020 (v1.23);
  - Was very sick for the last week :(
- - Implemented roles, and removed role-rewards mode. Everyone is now considered a rebel if roles == False!
- - Minor print() statement updates
+ - Emperor now gets +1 health in games above 4 players!
 
  TO DO:
  - Greedy Player Mode
@@ -56,6 +55,9 @@ def generate_players(num, roles):
 
     for player in players:
         player.character = char_names.pop(0)
+        if (num > 4) and (player.role == "Emperor"):
+            player.current_health += 1
+            player.max_health += 1
 
     return players
 
@@ -382,6 +384,8 @@ def play_games(num_players, num_iterations, lightning_dmg=3, roles=True):
 
             elif len(players) == 1:
                 game_started = False
+                print(
+                    "-------------------------------------<Game Over!>-------------------------------------")
                 print(f"{players[0]} has won the game!!!")
                 print(f"Turn number: {players[0].turn_number}!")
 
@@ -2011,4 +2015,4 @@ class Player:
 # 'iterations' refers to the number of iterations that the game will run
 # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning - 3 by default
 # 'roles' refers to whether there are any player roles in-game - True by default (if False: all players will be considered rebels)
-play_games(num_players=8, num_iterations=1000, lightning_dmg=3, roles=False)
+play_games(num_players=8, num_iterations=10000, lightning_dmg=3, roles=True)
