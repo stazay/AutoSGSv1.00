@@ -8,11 +8,10 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 23/10/2020
-Version 1.23
+Version 1.24
 
- + 23/10/2020 (v1.23);
- - Was very sick for the last week :(
- - Emperor now gets +1 health in games above 4 players!
+ + 23/10/2020 (v1.24);
+ - Added toggle for more_spies in 6-8 players within play_games()
 
  TO DO:
  - Greedy Player Mode
@@ -22,9 +21,8 @@ import random
 
 
 # --- Game-Setup
-def generate_players(num, roles):
+def generate_players(num):
     # 'num' refers to the number of players you want to generate
-    # 'roles' refers to whether the players will be generated with roles (for win-conditions) or not
     global roles_dict
 
     if num > 10:
@@ -37,7 +35,7 @@ def generate_players(num, roles):
                "Female", "Female", "Female", "Female", "Female"]
     random.shuffle(genders)
 
-    if roles:
+    if roles != 0:
         roles_dict = generate_roles(num)
         roles_list = []
         for key in roles_dict.keys():
@@ -288,11 +286,17 @@ def generate_roles(num):
     elif num == 5:
         roles_dict = {"Emperor": 1, "Advisor": 1, "Rebel": 2, "Spy": 1}
     elif num == 6:
-        roles_dict = {"Emperor": 1, "Advisor": 1, "Rebel": 3, "Spy": 1}
+        if roles == 1:
+            roles_dict = {"Emperor": 1, "Advisor": 1, "Rebel": 3, "Spy": 1}
+        elif roles == 2:
+            roles_dict = {"Emperor": 1, "Advisor": 1, "Rebel": 2, "Spy": 2}
     elif num == 7:
         roles_dict = {"Emperor": 1, "Advisor": 2, "Rebel": 3, "Spy": 1}
     elif num == 8:
-        roles_dict = {"Emperor": 1, "Advisor": 2, "Rebel": 4, "Spy": 1}
+        if roles == 1:
+            roles_dict = {"Emperor": 1, "Advisor": 2, "Rebel": 4, "Spy": 1}
+        elif roles == 2:
+            roles_dict = {"Emperor": 1, "Advisor": 2, "Rebel": 3, "Spy": 2}
     elif num == 9:
         roles_dict = {"Emperor": 1, "Advisor": 3, "Rebel": 4, "Spy": 1}
     else:
@@ -315,13 +319,18 @@ def check_win_conditions():
         return False
 
 
-def play_games(num_players, num_iterations, lightning_dmg=3, roles=True):
+def play_games(num_players, num_iterations, lightning_dmg=3, mode=1):
     # 'num_players' refers to the number of players
     # 'iterations' refers to the number of iterations that the game will run
-    # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning - 3 by default
-    # 'roles' refers to whether there are any player roles in-game - True by default (if False: all players will be considered rebels)
+    # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning // 3 by default
+    # 'mode' refers to whether there are any player roles in-game // 0 = all rebels, 1 = normal roles, 2 = more spies
+    emp_and_co_wins = 0
+    spy_wins = 0
+    rebel_wins = 0
+
     for i in range(num_iterations):
         global lightning_damage
+        global roles
         global players
         global win_conditions
         global main_deck
@@ -332,10 +341,15 @@ def play_games(num_players, num_iterations, lightning_dmg=3, roles=True):
         if lightning_dmg < 0:
             lightning_dmg = 0
         lightning_damage = lightning_dmg
+        if mode > 2:
+            mode = 0
+        if mode < 0:
+            mode = 0
+        roles = mode
 
-        players = generate_players(num_players, roles)
+        players = generate_players(num_players)
 
-        if roles:
+        if roles != 0:
             win_conditions = "Roles"
             emp_and_co = []
             rebels = []
@@ -358,16 +372,18 @@ def play_games(num_players, num_iterations, lightning_dmg=3, roles=True):
         print("All players have been dealt 4 cards!")
         game_started = True
         while game_started:
-            if roles and check_win_conditions():
+            if (roles != 0) and check_win_conditions():
                 game_started = False
 
                 if roles_dict["Emperor"] == 1 and roles_dict["Rebel"] == 0 and roles_dict["Spy"] == 0:
+                    emp_and_co_wins += 1
                     print(
                         "----------------------------<Emperor and Advisor(s) win!>-----------------------------")
                     for player in emp_and_co:
                         print(f"{player} - {player.role}")
 
                 elif roles_dict["Spy"] == 1 and roles_dict["Emperor"] == 0 and roles_dict["Advisor"] == 0 and roles_dict["Rebel"] == 0:
+                    spy_wins += 1
                     print(
                         "-------------------------------------<Spy wins!>--------------------------------------")
                     for player in players:
@@ -375,6 +391,7 @@ def play_games(num_players, num_iterations, lightning_dmg=3, roles=True):
                             print(f"{player} - {player.role}")
 
                 elif roles_dict["Emperor"] == 0:
+                    rebel_wins += 1
                     print(
                         "------------------------------------<Rebels win!>-------------------------------------")
                     for player in rebels:
@@ -398,6 +415,14 @@ def play_games(num_players, num_iterations, lightning_dmg=3, roles=True):
                 else:
                     # If dead at end of turn
                     players.pop(0)
+
+    # Final win-results tally
+    if roles != 0:
+        print("----------------------------------------------------------------------------------------------------")
+        print(f"Final win-tally:")
+        print(f"{emp_and_co_wins} - Emperor and Advisor(s) won this many games")
+        print(f"{spy_wins} - Spy won this many games")
+        print(f"{rebel_wins} - Rebel(s) won this many games")
 
 
 # --- Loose Functions
@@ -1968,10 +1993,10 @@ class Player:
         while action_phase_active:
             if win_conditions == "Roles":
                 if check_win_conditions():
-                    return self.start_end_phase()
+                    return False
 
             elif len(players) < 2:
-                return self.start_end_phase()
+                return False
 
             actions = self.hand.contents + ["End Action-Phase"]
 
@@ -2013,6 +2038,6 @@ class Player:
 # --- LOOK HERE TO AUTOPLAY GAMES
 # 'num_players' refers to the number of players
 # 'iterations' refers to the number of iterations that the game will run
-# 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning - 3 by default
-# 'roles' refers to whether there are any player roles in-game - True by default (if False: all players will be considered rebels)
-play_games(num_players=8, num_iterations=10000, lightning_dmg=3, roles=True)
+# 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning // 3 by default
+# 'mode' refers to whether there are any player roles in-game // 0 = all rebels, 1 = normal roles, 2 = more spies
+play_games(num_players=10, num_iterations=20000, lightning_dmg=3, mode=1)
