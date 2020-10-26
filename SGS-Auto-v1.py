@@ -1098,12 +1098,14 @@ class Player:
                             print(
                                 f"{self.character} has healed {source.character} using a {peach}. ({source.current_health + output_value}/{source.max_health} HP remaining!)")
                             if source.check_break_brink_loop(output_value):
-                                reactions_possible = False
                                 return output_value
-
-                reactions_possible = False
-                return output_value
-
+                    else:
+                        reactions_possible = False
+                        return output_value
+                else:
+                    reactions_possible = False
+                    return output_value
+                
             elif response_required == "Negate":
                 possible_cards = []
                 for item in self.hand.contents:
