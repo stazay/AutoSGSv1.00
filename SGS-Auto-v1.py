@@ -10,12 +10,13 @@
 Current Version: 26/10/2020
 Version 1.26
 
- + 26/10/2020 (v1.25);
- - ...
+ + 26/10/2020 (v1.26);
+ - First attempts at CSV-writing - Extremely basic player, role, card_stats, win to CSV (no weapons yet)
 
  TO DO:
  - Greedy Player Mode
 """
+import csv
 import random
 
 
@@ -301,6 +302,10 @@ def generate_players(num):
             player.current_health += 1
             player.max_health += 1
 
+    for player in players:
+        player.card_stats = {"Player Name": player.character, "Player Role": player.role, "Attack used": 0, "Defend used": 0, "Peach used": 0, "Barbarians used": 0, "Granary used": 0, "Peach Gardens used": 0, "Rain of Arrows used": 0, "Coerce used": 0, "Dismantle used": 0, "Duel used": 0, "Greed used": 0, "Negate used": 0, "Steal used": 0,
+                             "Acedia used": 0, "Black Shield used": 0, "Eight-Trigrams used": 0, "Attack received": 0, "Peach received": 0, "Barbarians received": 0, "Granary received": 0, "Peach Gardens received": 0, "Rain of Arrows received": 0, "Coerce received": 0, "Dismantle received": 0, "Duel received": 0, "Steal received": 0, "Acedia received": 0, "Game won": False}
+
     return players
 
 
@@ -323,6 +328,15 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1):
     # 'iterations' refers to the number of iterations that the game will run
     # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning // 3 by default
     # 'mode' refers to whether there are any player roles in-game // 0 = all rebels, 1 = normal roles, 2 = more spies
+
+    # --- Basic CSV Code
+    fields = ["Player Name", "Player Role", "Attack used", "Defend used", "Peach used", "Barbarians used", "Granary used", "Peach Gardens used", "Rain of Arrows used", "Coerce used", "Dismantle used", "Duel used", "Greed used", "Negate used", "Steal used", "Acedia used", "Black Shield used",
+              "Eight-Trigrams used", "Attack received", "Peach received", "Barbarians received", "Granary received", "Peach Gardens received", "Rain of Arrows received", "Coerce received", "Dismantle received", "Duel received", "Steal received", "Acedia received", "Game won"]
+    with open("card_usage_stats.csv", "w", newline="") as csvfile:
+        writer = csv.DictWriter(csvfile, fields)
+        writer.writeheader()
+
+    # --- The rest...
     emp_and_co_wins = 0
     spy_wins = 0
     rebel_wins = 0
@@ -346,15 +360,9 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1):
         roles = mode
 
         players = generate_players(num_players)
-
-        if roles != 0:
-            emp_and_co = []
-            rebels = []
-            for player in players:
-                if player.role == "Emperor" or player.role == "Advisor":
-                    emp_and_co.append(player)
-                elif player.role == "Rebel":
-                    rebels.append(player)
+        players_at_start = []
+        for player in players:
+            players_at_start.append(player)
 
         main_deck = generate_deck()
         discard_deck = Deck([])
@@ -374,8 +382,10 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1):
                     emp_and_co_wins += 1
                     print(
                         "----------------------------<Emperor and Advisor(s) win!>-----------------------------")
-                    for player in emp_and_co:
-                        print(f"{player} - {player.role}")
+                    for player in players_at_start:
+                        if player.role == "Emperor" or player.role == "Advisor":
+                            player.card_stats["Game won"] = True
+                            print(f"{player.role} - {player}")
 
                 elif roles_dict["Spy"] == 1 and roles_dict["Emperor"] == 0 and roles_dict["Advisor"] == 0 and roles_dict["Rebel"] == 0:
                     spy_wins += 1
@@ -383,16 +393,24 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1):
                         "-------------------------------------<Spy wins!>--------------------------------------")
                     for player in players:
                         if player.role == "Spy":
-                            print(f"{player} - {player.role}")
+                            player.card_stats["Game won"] = True
+                            print(f"{player.role} - {player}")
 
                 elif roles_dict["Emperor"] == 0:
                     rebel_wins += 1
                     print(
                         "------------------------------------<Rebels win!>-------------------------------------")
-                    for player in rebels:
-                        print(f"{player} - {player.role}")
+                    for player in players_at_start:
+                        if player.role == "Rebel":
+                            player.card_stats["Game won"] = True
+                            print(f"{player.role} - {player}")
 
                 print(f"Turn number: {players[0].turn_number}!")
+
+                for player in players_at_start:
+                    with open("card_usage_stats.csv", "a", newline="") as csvfile:
+                        writer = csv.DictWriter(csvfile, fields)
+                        writer.writerow(player.card_stats)
 
             elif len(players) == 1:
                 game_started = False
@@ -400,6 +418,13 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1):
                     "-------------------------------------<Game Over!>-------------------------------------")
                 print(f"{players[0]} has won the game!!!")
                 print(f"Turn number: {players[0].turn_number}!")
+
+                players[0].card_stats["Game won"] = True
+
+                for player in players_at_start:
+                    with open("card_usage_stats.csv", "a", newline="") as csvfile:
+                        writer = csv.DictWriter(csvfile, fields)
+                        writer.writerow(player.card_stats)
 
             else:
                 players[0].start_beginning_phase()
@@ -593,6 +618,7 @@ class Player:
         self.lightning_immunity = False
         self.tools_immunity = False
         self.used_trigrams = False
+        self.card_stats = {}
 
     def __str__(self):
         equips = ""
@@ -791,6 +817,10 @@ class Player:
                 self.current_health += 1
                 print(
                     f"{self.character} has used a PEACH to heal by one from {self.current_health -1} to {self.current_health}.")
+
+                self.card_stats["Peach used"] += 1
+                self.card_stats["Peach received"] += 1
+
                 return True
             else:
                 return False
@@ -805,6 +835,9 @@ class Player:
 
             for player in players:
                 if (player != players[0]) and (player.current_health > 0) and (not player.tools_immunity):
+
+                    player.card_stats["Barbarians received"] += 1
+
                     barb_response = player.use_reaction_effect(
                         "Attack", card, self)
                     if type(barb_response) == Card:
@@ -827,6 +860,9 @@ class Player:
                                 item.check_brink_of_death_loop(self)
 
             discard_deck.add_to_top(card)
+
+            self.card_stats["Barbarians used"] += 1
+
             return True
 
         elif card.effect2 == "Granary":
@@ -839,6 +875,9 @@ class Player:
             granary.draw(main_deck, len(players), False)
             for player in players:
                 if not player.tools_immunity:
+
+                    player.card_stats["Granary received"] += 1
+
                     drawn = random.choice(granary.hand.contents)
                     granary.hand.contents.remove(drawn)
                     player.hand.add_to_top(drawn)
@@ -849,6 +888,9 @@ class Player:
                 discard_deck.add_to_top(discard)
 
             discard_deck.add_to_top(card)
+
+            self.card_stats["Granary used"] += 1
+
             return True
 
         elif card.effect2 == "Peach Gardens":
@@ -865,7 +907,12 @@ class Player:
                         print(
                             f"{player.character} has been healed by one. ({player.current_health}/{player.max_health} HP remaining)")
 
+                        player.card_stats["Peach Gardens received"] += 1
+
             discard_deck.add_to_top(card)
+
+            self.card_stats["Peach Gardens used"] += 1
+
             return True
 
         elif card.effect2 == "Rain of Arrows":
@@ -877,6 +924,9 @@ class Player:
 
             for player in players:
                 if (player != players[0]) and (player.current_health > 0) and (not player.tools_immunity):
+
+                    player.card_stats["Rain of Arrows received"] += 1
+
                     roa_response = player.use_reaction_effect(
                         "Defend", card, self)
                     if type(roa_response) == Card:
@@ -896,6 +946,9 @@ class Player:
                                 item.check_brink_of_death_loop(self)
 
             discard_deck.add_to_top(card)
+
+            self.card_stats["Rain of Arrows used"] += 1
+
             return True
 
         elif card.effect2 == "Coerce":
@@ -959,6 +1012,9 @@ class Player:
             print(f"{self.character} has played {card}.")
             if not check_negate_loop(players, card, self, self):
                 self.draw(main_deck, 2)
+
+                self.card_stats["Greed used"] += 1
+
             return True
 
         elif card.effect2 == "Negate":
@@ -992,6 +1048,10 @@ class Player:
                 self.hand.contents.remove(card)
                 target.pending_judgements.insert(0, card)
                 print(f"{self.character} has placed {card} on {target.character}!")
+
+                self.card_stats["Acedia used"] += 1
+                target.card_stats["Acedia received"] += 1
+
                 return True
 
         elif card.effect2 == "Lightning":
@@ -1091,6 +1151,9 @@ class Player:
                         discard_deck.add_to_top(peach)
                         output_value += 1
 
+                        self.card_stats["Peach used"] += 1
+                        source.card_stats["Peach received"] += 1
+
                         if self == source:
                             print(
                                 f"{self.character} has healed themselves using a {peach}! ({self.current_health + output_value}/{self.max_health} HP remaining!)")
@@ -1098,6 +1161,7 @@ class Player:
                             print(
                                 f"{self.character} has healed {source.character} using a {peach}. ({source.current_health + output_value}/{source.max_health} HP remaining!)")
                             if source.check_break_brink_loop(output_value):
+                                reactions_possible = False
                                 return output_value
                     else:
                         reactions_possible = False
@@ -1105,7 +1169,7 @@ class Player:
                 else:
                     reactions_possible = False
                     return output_value
-                
+
             elif response_required == "Negate":
                 possible_cards = []
                 for item in self.hand.contents:
@@ -1125,6 +1189,9 @@ class Player:
                         else:
                             print(
                                 f"{self.character} has played a {negate} against the {card} of {source.character}!")
+
+                        self.card_stats["Negate used"] += 1
+
                         return negate
                 return False
 
@@ -1154,6 +1221,9 @@ class Player:
                             discard_deck.add_to_top(negate)
                             print(
                                 f"{self.character} played a {negate} against the effects of {card.effect2.upper()} on {negated_for.character}!")
+
+                            self.card_stats["Negate used"] += 1
+
                             return [True, negate, negated_for, self]
                 return [False, None, None, None]
 
@@ -1305,6 +1375,9 @@ class Player:
                             defend = random.choice(possible_cards)
                             self.hand.contents.remove(defend)
                             discard_deck.add_to_top(defend)
+
+                            self.card_stats["Defend used"] += 1
+
                     else:
                         return defend
                 return defend
@@ -1318,6 +1391,8 @@ class Player:
         # 'target' refers to the player targeted by Attack!
         # 'attacker' refers to the source of the Attack (Coerce causes this to vary!)
         # 'card2' refers to any secondary 'Attack' cards used; this is used when there are any special effects (such as Serpent Spear)
+        self.card_stats["Attack used"] += 1
+        target.card_stats["Attack received"] += 1
 
         # Weapon and Black Shield checks
         self.check_gender_swords(target)
@@ -1359,6 +1434,9 @@ class Player:
 
     def activate_coerce(self, target):
         # 'target' refers to the player that will potentially be attacked by the coerced player!
+        self.card_stats["Coerce used"] += 1
+        target.card_stats["Coerce received"] += 1
+
         possible_cards = []
         for item in self.hand.contents:
             if item.effect == "Attack":
@@ -1411,6 +1489,9 @@ class Player:
         # 'card' refers to the 'Dismantle' card used in Player.use_card_effect(card)
         # 'target' refers to the player targeted by Dismantle!
         # 'dismantled' refers to the card targeted by Dismantle!
+        self.card_stats["Dismantle used"] += 1
+        target.card_stats["Dismantle received"] += 1
+
         total_cards = target.hand.contents + target.equipment + target.pending_judgements
         if len(total_cards) > 0:
             dismantled = random.choice(total_cards)
@@ -1436,6 +1517,9 @@ class Player:
         # 'card' refers to the 'Duel' card used in Player.use_card_effect(card)
         # 'target' refers to the player targeted by Duel!
         # 'duel_won' is a boolean that determines the winner of the duel
+        self.card_stats["Duel used"] += 1
+        target.card_stats["Duel received"] += 1
+
         duel_won = target.use_reaction_effect("Attack", card, self)
         damage_dealt = 1
 
@@ -1461,6 +1545,9 @@ class Player:
         # 'card' refers to the 'Dismantle' card used in Player.use_card_effect(card)
         # 'target' refers to the player targeted by Steal!
         # 'stolen' refers to the card targeted by Steal!
+        self.card_stats["Steal used"] += 1
+        target.card_stats["Steal received"] += 1
+
         total_cards = target.hand.contents + target.equipment + target.pending_judgements
         if len(total_cards) > 0:
             stolen = random.choice(total_cards)
@@ -1573,7 +1660,7 @@ class Player:
         if self.current_health < 1:
             if roles != 0:
                 print(
-                    f"{self.character} wasn't saved from the brink of death! Their role is {self.role}!")
+                    f"{self.character} wasn't saved from the brink of death! Their role is the {self.role}!")
             else:
                 print(f"{self.character} wasn't saved from the brink of death!")
             self.discard_all_cards(death=True)
@@ -1712,6 +1799,8 @@ class Player:
             if card.suit == "\u2660" or card.suit == "\u2663":
                 print(
                     f"  >> {self.character} has {self.equipment[armor_index]} equipped, and therefore CANNOT be affected by black attack cards ({card} discarded as normal).")
+
+                self.card_stats["Black Shield used"] += 1
                 return True
         return False
 
@@ -1733,6 +1822,9 @@ class Player:
             judgement_card = discard_deck.contents[0]
             print(
                 f"  >> Judgement: {self.character} flipped a {judgement_card}.")
+
+            self.card_stats["Eight-Trigrams used"] += 1
+
             if judgement_card.suit == "\u2665" or judgement_card.suit == "\u2666":
                 judgement_card.effect2 = "Defend"
                 return judgement_card
@@ -2041,4 +2133,4 @@ class Player:
 # 'iterations' refers to the number of iterations that the game will run
 # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning // 3 by default
 # 'mode' refers to whether there are any player roles in-game // 0 = all rebels, 1 = normal roles, 2 = more spies
-play_games(num_players=6, num_iterations=1000, lightning_dmg=3, mode=1)
+play_games(num_players=6, num_iterations=10, lightning_dmg=3, mode=1)
