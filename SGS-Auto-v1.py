@@ -7,59 +7,19 @@
 /________// /_//|_||/_//  |___// /________// /________// /________//  /________// /_//  /_// /_//| || /_//
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
-Current Version: 23/10/2020
-Version 1.24
+Current Version: 26/10/2020
+Version 1.26
 
- + 23/10/2020 (v1.24);
- - Added toggle for more_spies in 6-8 players within play_games()
+ + 26/10/2020 (v1.25);
+ - ...
 
  TO DO:
  - Greedy Player Mode
- - CSV stuff...
 """
 import random
 
 
 # --- Game-Setup
-def generate_players(num):
-    # 'num' refers to the number of players you want to generate
-    global roles_dict
-
-    if num > 10:
-        num = 10
-    if 3 > num:
-        num = 3
-
-    char_names = ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"]
-    genders = ["Male", "Male", "Male", "Male", "Male",
-               "Female", "Female", "Female", "Female", "Female"]
-    random.shuffle(genders)
-
-    if roles != 0:
-        roles_dict = generate_roles(num)
-        roles_list = []
-        for key in roles_dict.keys():
-            for item in range(0, roles_dict[key]):
-                roles_list.append(key)
-
-        random.shuffle(roles_list)
-        roles_list.append(roles_list.pop(roles_list.index("Emperor")))
-
-        players = [Player(genders.pop(0), roles_list.pop())
-                   for player_number in range(num)]
-
-    else:
-        players = [Player(genders.pop(0)) for player_number in range(num)]
-
-    for player in players:
-        player.character = char_names.pop(0)
-        if (num > 4) and (player.role == "Emperor"):
-            player.current_health += 1
-            player.max_health += 1
-
-    return players
-
-
 def generate_deck():
     # The deck! (108 cards total)
     global main_deck
@@ -305,6 +265,45 @@ def generate_roles(num):
     return roles_dict
 
 
+def generate_players(num):
+    # 'num' refers to the number of players you want to generate
+    global roles_dict
+
+    if num > 10:
+        num = 10
+    if 3 > num:
+        num = 3
+
+    char_names = ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"]
+    genders = ["Male", "Male", "Male", "Male", "Male",
+               "Female", "Female", "Female", "Female", "Female"]
+    random.shuffle(genders)
+
+    if roles != 0:
+        roles_dict = generate_roles(num)
+        roles_list = []
+        for key in roles_dict.keys():
+            for item in range(0, roles_dict[key]):
+                roles_list.append(key)
+
+        random.shuffle(roles_list)
+        roles_list.append(roles_list.pop(roles_list.index("Emperor")))
+
+        players = [Player(genders.pop(0), roles_list.pop())
+                   for player_number in range(num)]
+
+    else:
+        players = [Player(genders.pop(0)) for player_number in range(num)]
+
+    for player in players:
+        player.character = char_names.pop(0)
+        if (num > 4) and (player.role == "Emperor"):
+            player.current_health += 1
+            player.max_health += 1
+
+    return players
+
+
 def check_win_conditions():
     if roles_dict["Emperor"] == 1 and roles_dict["Rebel"] == 0 and roles_dict["Spy"] == 0:
         return True
@@ -332,7 +331,6 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1):
         global lightning_damage
         global roles
         global players
-        global win_conditions
         global main_deck
         global discard_deck
 
@@ -350,7 +348,6 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1):
         players = generate_players(num_players)
 
         if roles != 0:
-            win_conditions = "Roles"
             emp_and_co = []
             rebels = []
             for player in players:
@@ -358,8 +355,6 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1):
                     emp_and_co.append(player)
                 elif player.role == "Rebel":
                     rebels.append(player)
-        else:
-            win_conditions = "Survival"
 
         main_deck = generate_deck()
         discard_deck = Deck([])
@@ -1574,10 +1569,14 @@ class Player:
 
         # If player died
         if self.current_health < 1:
-            print(f"{self.character} wasn't saved from the brink of death!")
+            if roles != 0:
+                print(
+                    f"{self.character} wasn't saved from the brink of death! Their role is {self.role}!")
+            else:
+                print(f"{self.character} wasn't saved from the brink of death!")
             self.discard_all_cards(death=True)
             players.pop(dying_index)
-            if win_conditions == "Roles":
+            if roles != 0:
                 roles_dict[self.role] -= 1
 
             if source != None:
@@ -1976,7 +1975,7 @@ class Player:
 
     def start_judgement_phase(self):
         if self.check_pending_judgements() == "Break":
-            return "Break"
+            return False
         else:
             return self.start_drawing_phase()
 
@@ -1991,7 +1990,7 @@ class Player:
     def start_action_phase(self):
         action_phase_active = True
         while action_phase_active:
-            if win_conditions == "Roles":
+            if roles != 0:
                 if check_win_conditions():
                     return False
 
@@ -2040,4 +2039,4 @@ class Player:
 # 'iterations' refers to the number of iterations that the game will run
 # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning // 3 by default
 # 'mode' refers to whether there are any player roles in-game // 0 = all rebels, 1 = normal roles, 2 = more spies
-play_games(num_players=10, num_iterations=20000, lightning_dmg=3, mode=1)
+play_games(num_players=6, num_iterations=1000, lightning_dmg=3, mode=1)
