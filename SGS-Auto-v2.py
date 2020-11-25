@@ -7,25 +7,14 @@
 /________// /_//|_||/_//  |___// /________// /________// /________//  /________// /_//  /_// /_//| || /_//
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
-Current Version: 25/11/2020
-Version 2.00
+Current Version: 26/11/2020
+Version 2.01
 
- + 25/11/2020 (v2.00);
+ + 26/11/2020 (v2.01);
+ - Minor bugfixes to account for the newly ported character abilities!
+ - Simplified "Player.calculate_targets_in_range()" to return Player objects and not indexes... 
  - Implementation of following characters and abilities:
-    - Diao Chan: Eclipse the Moon
-    - Guan Yu / Ma Chao / Pang De: Horsemanship
-    - Guo Jia: Envy of Heaven
-    - Hua Tuo: First Aid
-    - Huang Yue Ying: Talent
-    - Huang Yue Ying: Wisdom
-    - Lu Meng: Restraint
-    - Lu Xun: Humility
-    - Zhang Fei: Berserk
-    - Zhao Yun: Dragon Heart
-    - Zhen Ji: Goddess Luo
-    - Zhen Ji: Impetus
-    - Zhou Yu: Dashing Hero
-    - Zhuge Liang: Empty City
+    - N/A
 
  TO DO:
  - All base-characters (x32)
@@ -839,15 +828,15 @@ class Player:
         if card.effect2 == "Black Attack":
             if (self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow()) or (self.check_berserk):
                 targets = self.calculate_targets_in_weapon_range()
-                for player in targets:
-                    if player.empty_city():
-                        targets.remove(player)
+                for target in targets:
+                    if target.check_empty_city():
+                        targets.remove(target)
                         break
 
                 if len(targets) < 1:
                     return False
                 else:
-                    target = players[random.choice(targets)]
+                    target = random.choice(targets)
                     self.attacks_this_turn += 1
                     if (card not in discard_deck.contents) and (card in self.hand.contents):
                         self.hand.contents.remove(card)
@@ -865,15 +854,15 @@ class Player:
         elif card.effect2 == "Red Attack":
             if (self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow()) or (self.check_berserk):
                 targets = self.calculate_targets_in_weapon_range()
-                for player in targets:
-                    if player.empty_city():
-                        targets.remove(player)
+                for target in targets:
+                    if target.check_empty_city():
+                        targets.remove(target)
                         break
 
                 if len(targets) < 1:
                     return False
                 else:
-                    target = players[random.choice(targets)]
+                    target = random.choice(targets)
                     self.attacks_this_turn += 1
                     if (card not in discard_deck.contents) and (card in self.hand.contents):
                         self.hand.contents.remove(card)
@@ -891,15 +880,15 @@ class Player:
         elif card.effect2 == "Colourless Attack":
             if (self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow()) or (self.check_berserk):
                 targets = self.calculate_targets_in_weapon_range()
-                for player in targets:
-                    if player.empty_city():
-                        targets.remove(player)
+                for target in targets:
+                    if target.check_empty_city():
+                        targets.remove(target)
                         break
 
                 if len(targets) < 1:
                     return False
                 else:
-                    target = players[random.choice(targets)]
+                    target = random.choice(targets)
                     self.attacks_this_turn += 1
                     if (card not in discard_deck.contents) and (card in self.hand.contents):
                         self.hand.contents.remove(card)
@@ -918,15 +907,15 @@ class Player:
         elif card.effect2 == "Attack":
             if (self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow()) or (self.check_berserk):
                 targets = self.calculate_targets_in_weapon_range()
-                for player in targets:
-                    if player.empty_city():
-                        targets.remove(player)
+                for target in targets:
+                    if target.check_empty_city():
+                        targets.remove(target)
                         break
 
                 if len(targets) < 1:
                     return False
                 else:
-                    target = players[random.choice(targets)]
+                    target = random.choice(targets)
                     self.attacks_this_turn += 1
                     self.hand.contents.remove(card)
                     discard_deck.add_to_top(card)
@@ -1093,7 +1082,7 @@ class Player:
                 coerced = random.choice(targets)
                 targets = coerced.calculate_targets_in_weapon_range()
                 for player in targets:
-                    if player.empty_city():
+                    if player.check_empty_city():
                         targets.remove(player)
                         break
 
@@ -1103,7 +1092,7 @@ class Player:
                     self.hand.contents.remove(card)
                     discard_deck.add_to_top(card)
                     self.check_wisdom()
-                    attacked = players[random.choice(targets)]
+                    attacked = random.choice(targets)
                     print(
                         f"{coerced.character} is being coerced into attacking {attacked.character}!")
                     if not check_negate_loop(players, card, self, coerced):
@@ -1128,7 +1117,7 @@ class Player:
         elif card.effect2 == "Duel":
             targets = players[1:]
             for player in targets:
-                if player.empty_city():
+                if player.check_empty_city():
                     targets.remove(player)
                     break
 
@@ -1166,7 +1155,7 @@ class Player:
 
             if len(targets) < 1:
                 return False
-            target = players[random.choice(targets)]
+            target = random.choice(targets)
 
             if (len(target.hand.contents) + len(target.equipment) + len(target.pending_judgements)) < 1:
                 return False
@@ -1305,7 +1294,7 @@ class Player:
                     activated = random.choice(choices)
                     if activated:
                         peach = random.choice(possible_cards)
-                        if card in self.hand.contents:
+                        if peach in self.hand.contents:
                             self.hand.contents.remove(peach)
                         else:
                             self.equipment.remove(peach)
@@ -1766,7 +1755,7 @@ class Player:
     def calculate_targets_in_physical_range(self, modifier=0):
         # 'modifier' refers to any bonuses granted/penalized by abilities/equipment
         my_index = get_player_index(self)
-        output = []
+        indexes = []
         if self.check_horsemanship():
             modifier += 1
 
@@ -1788,14 +1777,19 @@ class Player:
                 if distance > len(players) / 2:
                     distance = len(players) - distance
                 if distance - (1 + modifier) + (target_modifier) <= 0:
-                    output.append(target_index)
+                    indexes.append(target_index)
+
+        output = []
+        for index in indexes:
+            output.append(players[index])
+
         return output
 
     def calculate_targets_in_weapon_range(self, modifier=0, omit=None):
         # 'modifier' refers to any bonuses granted/penalized by abilities/equipment
         # 'omit' refers to any players that are untargetable during this calculation
         my_index = get_player_index(self)
-        output = []
+        indexes = []
         weapon_range = 1
         if self.check_horsemanship():
             modifier += 1
@@ -1819,9 +1813,14 @@ class Player:
                 if distance > len(players) / 2:
                     distance = len(players) - distance
                 if distance - (weapon_range + modifier) + (target_modifier) <= 0:
-                    output.append(target_index)
+                    indexes.append(target_index)
         if omit != None:
-            output.remove(omit)
+            indexes.remove(omit)
+
+        output = []
+        for index in indexes:
+            output.append(players[index])
+
         return output
 
     def check_break_brink_loop(self, amount_healed):
@@ -2216,26 +2215,23 @@ class Player:
             print(
                 f"  >> {self.character} has used their last hand-card to ATTACK {target.character} with {self.equipment[weapon_index]}. They can target up to two extra players!")
             targets = self.calculate_targets_in_weapon_range()
-            target_index1 = get_player_index(target)
-            targets.remove(target_index1)
+            targets.remove(target)
             if len(targets) < 1:
                 return 0
 
             else:
                 targets.append("No more!")
-                target_index2 = random.choice(targets)
-                if target_index2 == "No more!":
+                target2 = random.choice(targets)
+                if target2 == "No more!":
                     return 0
-                target2 = players[target_index2]
-                targets.remove(target_index2)
+                targets.remove(target2)
                 if len(targets) < 1:
                     return [True, target2]
 
                 else:
-                    target_index3 = random.choice(targets)
-                    if target_index3 == "No more!":
+                    target3 = random.choice(targets)
+                    if target3 == "No more!":
                         return [True, target2]
-                    target3 = players[target_index3]
                     return [True, target2, target3]
         return 0
 
@@ -2428,4 +2424,4 @@ class Player:
 # 'iterations' refers to the number of iterations that the game will run
 # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning // 3 by default
 # 'mode' refers to whether there are any player roles in-game // 0 = all rebels, 1 = normal roles, 2 = more spies
-play_games(num_players=5, num_iterations=1000, lightning_dmg=3, mode=1)
+play_games(num_players=5, num_iterations=10000, lightning_dmg=3, mode=1)
