@@ -11,16 +11,15 @@ Current Version: 26/11/2020
 Version 2.02
 
  + 26/11/2020 (v2.02);
+ - Minor bugfix with Brink of Death Loop (only really affects Hua Xiong: Reckless)
  - Implementation of following characters and abilities:
-    - Guan Yu: Warrior Saint
-    - Huang Zhong: Fearsome Archer
-    - Lu Bu: Without Equal
-    - Lu Xun: One After Another
-    - Ma Chao: Iron Cavalry
-    - Pang De: Fearsome Advance
-    - Sun Quan: Rescued
-    - Sun Shang Xiang: Warrior Woman
-    - Yuan Shu: Mediocrity
+    - Da Qiao: National Colours
+    - Gan Ning: Surprise
+    - Hua Xiong: Reckless
+    - Jia Xu: Unmitigated Murder
+    - Yuan Shao: Bloodline
+    - Yuan Shao: Random Strike
+    - Yuan Shu: False Ruler
 
  TO DO:
  - All base-characters (x32)
@@ -473,6 +472,7 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1):
             f"----------------------------------------<Game {i}: The deck has been shuffled!>----------------------------------------")
         for player in players:
             player.draw(main_deck, 4, False)
+            player.check_false_ruler()
         print("All players have been dealt 4 cards!")
         game_started = True
         while game_started:
@@ -940,7 +940,7 @@ class Player:
                     discard_deck.add_to_top(card)
                     self.check_one_after_another()
                     print(
-                        f"{self.character} has played {card} against {target.character}.")
+                        f"{self.character} has played {card} to ATTACK {target.character}.")
                     extra_targets = self.check_weapon_sky_scorcher_halberd(
                         target)
                     if (extra_targets == 0):
@@ -1056,8 +1056,13 @@ class Player:
 
         elif card.effect2 == "Rain of Arrows":
             self.hand.contents.remove(card)
-            print(
-                f"{self.character} has activated {card}. All players will take one damage (unless playing DEFEND or tool-card negated).")
+            if card2 != None:
+                self.hand.contents.remove(card2)
+                print(
+                    f"{self.character} has activated RAIN OF ARROWS using {card}/{card2}. All players will take one damage (unless playing DEFEND or tool-card negated).")
+            else:
+                print(
+                    f"{self.character} has activated {card}. All players will take one damage (unless playing DEFEND or tool-card negated).")
             self.check_one_after_another()
             self.check_wisdom()
 
@@ -1084,6 +1089,8 @@ class Player:
                                 item.check_brink_of_death_loop(self)
 
             discard_deck.add_to_top(card)
+            if card2 != None:
+                self.hand.contents.remove(card2)
             return True
 
         elif card.effect2 == "Coerce":
@@ -1134,7 +1141,7 @@ class Player:
                 self.hand.contents.remove(card)
                 discard_deck.add_to_top(card)
                 print(
-                    f"{self.character} has played {card} against {target.character}.")
+                    f"{self.character} has played {card} as DISMANTLE against {target.character}.")
                 self.check_one_after_another()
                 self.check_wisdom()
                 if not check_negate_loop(players, card, self, target):
@@ -1151,7 +1158,8 @@ class Player:
             target = random.choice(targets)
             self.hand.contents.remove(card)
             discard_deck.add_to_top(card)
-            print(f"{self.character} has played {card} against {target.character}.")
+            print(
+                f"{self.character} has played {card} as DUEL against {target.character}.")
             self.check_one_after_another()
             self.check_wisdom()
             if not check_negate_loop(players, card, self, target):
@@ -1193,7 +1201,7 @@ class Player:
                 discard_deck.add_to_top(card)
                 self.check_wisdom()
                 print(
-                    f"{self.character} has played {card} against {target.character}.")
+                    f"{self.character} has played {card} as STEAL against {target.character}.")
                 self.check_one_after_another()
                 self.check_wisdom()
                 if not check_negate_loop(players, card, self, target):
@@ -1216,7 +1224,8 @@ class Player:
             else:
                 self.hand.contents.remove(card)
                 target.pending_judgements.insert(0, card)
-                print(f"{self.character} has placed {card} on {target.character}!")
+                print(
+                    f"{self.character} has placed {card} as ACEDIA on {target.character}!")
                 self.check_one_after_another()
                 self.check_wisdom()
                 return True
@@ -1949,52 +1958,62 @@ class Player:
             dying_index = get_player_index(self)
             reacting_index = dying_index
 
-        # Regular Brink of Death Loop
-        for player in players[dying_index:]:
-            if self.current_health > 0:
-                break
-            self.current_health += player.use_reaction_effect(
-                "Brink Of Death", None, self)
-            reacting_index += 1
-            if reacting_index >= len(players):
-                reacting_index -= len(players)
-        for player in players[:dying_index]:
-            if self.current_health > 0:
-                break
-            self.current_health += player.use_reaction_effect(
-                "Brink Of Death", None, self)
-            reacting_index += 1
-            if reacting_index >= len(players):
-                reacting_index -= len(players)
+            # Unmitigated Murder Loop
+            if players[0].check_unmitigated_murder():
+                self.current_health += self.use_reaction_effect(
+                    "Brink Of Death", None, self)
+                if (self != players[0]) and (self.current_health < 1):
+                    self.current_health += players[0].use_reaction_effect(
+                        "Brink Of Death", None, self)
 
-        # If player died
-        if self.current_health < 1:
-            if roles != 0:
-                print(
-                    f"{self.character} wasn't saved from the brink of death! Their role is {self.role}!")
+            # Regular Brink of Death Loop
             else:
-                print(f"{self.character} wasn't saved from the brink of death!")
-            self.discard_all_cards(death=True)
-            players.pop(dying_index)
-            if roles != 0:
-                roles_dict[self.role] -= 1
+                for player in players[dying_index:]:
+                    if self.current_health > 0:
+                        break
+                    self.current_health += player.use_reaction_effect(
+                        "Brink Of Death", None, self)
+                    reacting_index += 1
+                    if reacting_index >= len(players):
+                        reacting_index -= len(players)
+                for player in players[:dying_index]:
+                    if self.current_health > 0:
+                        break
+                    self.current_health += player.use_reaction_effect(
+                        "Brink Of Death", None, self)
+                    reacting_index += 1
+                    if reacting_index >= len(players):
+                        reacting_index -= len(players)
 
-            if source != None:
-                if (self.role == "Rebel"):
+                # If player died
+                if self.current_health < 1:
+                    if roles != 0:
+                        print(
+                            f"{self.character} wasn't saved from the brink of death! Their role is {self.role}!")
+                    else:
+                        print(
+                            f"{self.character} wasn't saved from the brink of death!")
+                    self.discard_all_cards(death=True)
+                    players.pop(dying_index)
+                    if roles != 0:
+                        roles_dict[self.role] -= 1
+
+                    if source != None:
+                        if (self.role == "Rebel"):
+                            print(
+                                f"{source.character} draws 3 cards for killing {self.character}!")
+                            source.draw(main_deck, 3, False)
+                        if (self.role == "Advisor") and (source.role == "Emperor"):
+                            print(
+                                f"{source.character} loses all their cards for killing their Advisor ({self.character}).")
+                            source.discard_all_cards()
+
+                    return "Break"
+
+                # If player survived
+                else:
                     print(
-                        f"{source.character} draws 3 cards for killing {self.character}!")
-                    source.draw(main_deck, 3, False)
-                if (self.role == "Advisor") and (source.role == "Emperor"):
-                    print(
-                        f"{source.character} loses all their cards for killing their Advisor ({self.character}).")
-                    source.discard_all_cards()
-
-            return "Break"
-
-        # If player survived
-        else:
-            print(
-                f"{self.character} has been successfully healed back to {self.current_health}/{self.max_health} HP.")
+                        f"{self.character} has been successfully healed back to {self.current_health}/{self.max_health} HP.")
 
     def check_pending_judgements(self):
         while len(self.pending_judgements) > 0:
@@ -2370,6 +2389,21 @@ class Player:
                 f"  >> Character Ability: Berserk; {self.character} has no limit to the amount of attacks they can play.")
             return True
 
+    def check_bloodline(self):
+        # "Bloodline (Ruler Ability): Your maximum hand-limit is increased by two for each other Hero character still alive."
+        limit_increase = 0
+        if ((self.role == "Emperor") or ("False Ruler:" in self.char_abils)):
+            if ("Bloodline (Ruler Ability):" in self.char_abils):
+                heroes = []
+                for player in players:
+                    if player.allegiance == 'Heroes':
+                        heroes.append("1")
+                limit_increase = ((len(heroes)-1)*2)
+                if limit_increase > 0:
+                    print(
+                        f"  >> Character Ability: Bloodline (Ruler Ability); {self.character}'s hand limit is increased by {limit_increase} (two for every other HERO character still alive).")
+        return limit_increase
+
     def check_dashing_hero(self):
         # "Dashing Hero: Draw an extra card at the start of your turn."
         if "Dashing Hero:" in self.char_abils:
@@ -2403,6 +2437,24 @@ class Player:
             print(
                 f"  >> Character Ability: Envy of Heaven; The top judgement card has been added to {self.character}'s hand before it takes effect.")
             self.draw(discard_deck, 1, False)
+
+    def check_false_ruler(self):
+        # "False Ruler: You possess the same ruler ability as the current emperor."
+        if "False Ruler:" in self.char_abils:
+            for player in players:
+                if player.role == 'Emperor':
+                    if player.character == "Liu Bei":
+                        self.char_abils.append(
+                            "Rouse (Ruler Ability): If you need to use an ATTACK, you can ask any member of Shu to play it on your behalf.")
+                    elif player.character == "Cao Cao":
+                        self.char_abils.append(
+                            "Escort (Ruler Ability): If you need to use a DEFEND, you can ask any member of Wei to play it on your behalf.")
+                    elif player.character == "Sun Quan":
+                        self.char_abils.append(
+                            "Rescued (Ruler Ability): Whenever another member of Wu uses a PEACH to save you from the brink of death, it provides you with two units of health.")
+                    elif player.character == "Yuan Shao":
+                        self.char_abils.append(
+                            "Bloodline (Ruler Ability): Your maximum hand-limit is increased by two for each other Hero character still alive.")
 
     def check_fearsome_advance(self, target):
         # --- "Fearsome Advance: Whenever your ATTACK is evaded by a DEFEND, you can discard one of your opponents cards (on-hand or equipped)."
@@ -2546,6 +2598,11 @@ class Player:
                 return True
         return False
 
+    def check_national_colours(self):
+        # "National Colours: During your action phase, you can use any of your cards (on-hand or equipped) with a \u2666 suit as ACEDIA."
+        if "National Colours:" in self.char_abils:
+            return True
+
     def check_one_after_another(self):
         # "One After Another: Whenever you use or lose your last on-hand card, you can immediately draw one card from the deck."
         if "One After Another:" in self.char_abils:
@@ -2553,6 +2610,36 @@ class Player:
                 print(
                     f"  >> Character Ability: One After Another; {self.character} draws a card whenever they use or lose their last on-hand card.")
                 self.draw(main_deck, 1, False)
+
+    def check_random_strike(self):
+        # "Random Strike: You can use any two hand-cards which have the same suit as RAIN OF ARROWS."
+        output = []
+        if "Random Strike:" in self.char_abils:
+            same_cards = {"\u2660": 0, "\u2663": 0, "\u2665": 0, "\u2666": 0}
+            for item in self.hand.contents:
+                card_suit = item.suit
+                same_cards[card_suit] += 1
+
+            for suit in same_cards:
+                if same_cards[suit] > 1:
+                    output.append(suit)
+
+        return output
+
+    def check_reckless(self, card):
+        # --- "Reckless: Every instance that you suffer damage from a red-suited ATTACK, or a WINE ATTACK, your maximum health limit is reduced by one instead."
+        # 'card' refers to the card that caused the ATTACK effect
+        if "Reckless:" in self.char_abils:
+            if (card.suit == "\u2665") or (card.suit == "\u2666"):
+                self.max_health -= 1
+                if self.current_health > self.max_health:
+                    self.current_health -= 1
+                print(
+                    f"  >> Character Ability: Reckless; {self.character} has taken damage from {card}, and therefore loses a maximum health! ({self.current_health}/{self.max_health} HP remaining).")
+                for player in players:
+                    if player.current_health < 1:
+                        player.check_brink_of_death_loop(self)
+                return True
 
     def check_rescued(self, healer):
         # --- "Rescued (Ruler Ability): Whenever another member of Wu uses a PEACH to save you from the brink of death, it provides you with two units of health."
@@ -2573,9 +2660,21 @@ class Player:
                     f"  >> Character Ability: Restraint; {self.character} skips their discard phase.")
                 return True
 
+    def check_surprise(self):
+        # "Surprise: During your action phase, you can use any of your black-suited cards (on-hand or equipped) as DISMANTLE."
+        if "Surprise:" in self.char_abils:
+            return True
+
     def check_talent(self):
         # "Talent: You can use tool cards without range restrictions."
         if "Talent:" in self.char_abils:
+            return True
+
+    def check_unmitigated_murder(self):
+        # "Unmitigated Murder: During your turn, with the exception of yourself, only characters on the brink of death can use a PEACH."
+        if "Unmitigated Murder:" in self.char_abils:
+            print(
+                f"  >> Character Ability: Unmitigated Murder; On his turn, with the exception of {self.character}, only characters on the brink of death can use a PEACH.")
             return True
 
     def check_warrior_saint(self):
@@ -2656,15 +2755,28 @@ class Player:
                 return False
 
             actions = self.hand.contents + ["End Action-Phase"]
-            if self.check_warrior_saint():
-                actions += self.equipment
+
+            # Ability Checks
+            suits = self.check_random_strike()
+
+            if self.check_national_colours():
+                for item in self.equipment:
+                    if item.suit == "\u2666":
+                        actions.append(item)
+            elif self.check_surprise():
+                for item in self.equipment:
+                    if (item.suit == "\u2660") or (item.suit == "\u2663"):
+                        actions.append(item)
+            elif self.check_warrior_saint():
+                for item in self.equipment:
+                    if (item.suit == "\u2665") or (item.suit == "\u2666"):
+                        actions.append(item)
 
             # Serpent Spear Check
-            serp_spear = None
             if (len(self.hand.contents) > 1) and (self.attacks_this_turn == 0):
                 for serp_spear in self.equipment:
                     if serp_spear.effect == "Serpent Spear":
-                        actions.append(serp_spear)
+                        actions.append("serp_spear")
                         break
 
             card = random.choice(actions)
@@ -2677,30 +2789,65 @@ class Player:
                 else:
                     return self.start_discard_phase()
 
-            elif card == serp_spear:
+            elif card == "serp_spear":
                 serp_spear = self.check_weapon_serpent_spear()
                 self.use_card_effect(serp_spear[0], serp_spear[1])
 
             else:
-                if (self.check_warrior_saint()) and ((card.suit == "\u2665") or (card.suit == "\u2666")):
+                activated = False
+                card2 = None
+
+                # Checks for character-specific card-effects
+                if (self.check_random_strike()) and (card.suit in suits):
+                    choices = [True, False]
+                    activated = random.choice(choices)
+                    if activated:
+                        possible_cards = []
+                        for item in self.hand.contents:
+                            if (item != card) and (item.suit == card.suit):
+                                possible_cards.append(item)
+                        card2 = random.choice(possible_cards)
+                        card.effect2 = "Rain of Arrows"
+                        card2.effect2 = "Rain of Arrows"
+
+                elif (self.check_national_colours()) and (card.suit == "\u2666"):
+                    choices = [True, False]
+                    activated = random.choice(choices)
+                    if activated:
+                        card.effect2 = "Acedia"
+                elif (self.check_surprise()) and ((card.suit == "\u2660") or (card.suit == "\u2663")):
+                    choices = [True, False]
+                    activated = random.choice(choices)
+                    if activated:
+                        card.effect2 = "Dismantle"
+                elif (self.check_warrior_saint()) and ((card.suit == "\u2665") or (card.suit == "\u2666")):
                     choices = [True, False]
                     activated = random.choice(choices)
                     if activated:
                         card.effect2 = "Attack"
-                    self.use_card_effect(card)
-                else:
+
+                # Otherwise, use normal card-effect
+                if not activated:
                     card.effect2 = card.effect
-                    self.use_card_effect(card)
+                self.use_card_effect(card, card2)
 
     def start_discard_phase(self):
+        # Hand-limit abilities
+        limit_increase = self.check_bloodline()
+
         # Unique discarding abilities
         if self.check_mediocrity_discard():
+            if len(self.hand.contents) > (self.current_health + limit_increase):
+                difference = (len(self.hand.contents) -
+                              (self.current_health + limit_increase))
+                self.discard("Handquip", difference)
             return self.start_end_phase()
 
         # Discard down to your current health level
         difference = 0
-        if len(self.hand.contents) > self.current_health:
-            difference = (len(self.hand.contents) - self.current_health)
+        if len(self.hand.contents) > (self.current_health + limit_increase):
+            difference = (len(self.hand.contents) -
+                          (self.current_health + limit_increase))
             self.discard("Hand", difference)
         return self.start_end_phase()
 
@@ -2715,4 +2862,4 @@ class Player:
 # 'iterations' refers to the number of iterations that the game will run
 # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning // 3 by default
 # 'mode' refers to whether there are any player roles in-game // 0 = all rebels, 1 = normal roles, 2 = more spies
-play_games(num_players=8, num_iterations=10, lightning_dmg=3, mode=1)
+play_games(num_players=8, num_iterations=100, lightning_dmg=3, mode=1)
