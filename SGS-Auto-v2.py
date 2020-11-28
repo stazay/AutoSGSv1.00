@@ -7,17 +7,20 @@
 /________// /_//|_||/_//  |___// /________// /________// /________//  /________// /_//  /_// /_//| || /_//
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
-Current Version: 27/11/2020
-Version 2.03
+Current Version: 28/11/2020
+Version 2.04
 
- + 27/11/2020 (v2.03);
- - Renamed any "item" variables to "i" variables
+ + 28/11/2020 (v2.04);
+ - Added strings to effects where cards use secondary effects
+ - Refactored some code to be less repetitive
+ - 9 abilities to go...
  - Implementation of following characters and abilities:
-    - Cao Cao: Evil Hero
-    - Xu Chu: Bare the Chest
-    - Yan Liang & Wen Chou: Dual Heroes
-    - Zhang Liao: Raid
-    - Zhuge Liang: Astrology
+    - Da Qiao: Displacement
+    - Diao Chan: Seed of Animosity
+    - Hua Tuo: Green Salve
+    - Huang Gai: Trojan Flesh
+    - Liu Bei: Benevolence
+    - Sun Quan: Reconsider
 
  TO DO:
  - All base-characters (x32)
@@ -129,7 +132,7 @@ def generate_character_cards():
 
     all_characters = shu_characters + wei_characters + wu_characters + hero_characters
 
-    return all_emperors, all_characters
+    return (all_emperors, all_characters)
 
 
 def generate_deck():
@@ -955,8 +958,8 @@ class Player:
                 return False
 
         elif card.effect2 == "Defend":
-            if (self.check_dragon_heart()) and ((self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow())):
-                card.effect2 = "Defend"
+            if ("Dragon Heart:" in self.char_abils) and ((self.attacks_this_turn == 0) or (self.check_weapon_zhuge_crossbow())):
+                self.check_dragon_heart_defend_to_attack(card)
                 return self.use_card_effect(card)
             else:
                 return False
@@ -1322,7 +1325,7 @@ class Player:
                 possible_cards = []
 
                 # Check all possible cards
-                if self.check_first_aid():
+                if ("First Aid:" in self.char_abils):
                     for i in self.hand.contents:
                         if i.effect == "Peach":
                             possible_cards.append(i)
@@ -1342,10 +1345,12 @@ class Player:
                     activated = random.choice(choices)
                     if activated:
                         peach = random.choice(possible_cards)
-                        if peach in self.hand.contents:
-                            self.hand.contents.remove(peach)
-                        else:
+                        if peach in self.equipment:
+                            self.check_first_aid(peach)
                             self.equipment.remove(peach)
+                        else:
+                            self.check_first_aid(peach)
+                            self.hand.contents.remove(peach)
                         discard_deck.add_to_top(peach)
                         output_value += 1
                         output_value += source.check_rescued(self)
@@ -1431,12 +1436,12 @@ class Player:
                 possible_cards = []
 
                 # Check all possible cards
-                if self.check_dragon_heart():
+                if ("Dragon Heart:" in self.char_abils):
                     for i in self.hand.contents:
                         if (i.effect == "Attack") or (i.effect == "Defend"):
                             possible_cards.append(i)
 
-                elif self.check_warrior_saint():
+                elif ("Warrior Saint:" in self.char_abils):
                     for i in self.hand.contents:
                         if (i.effect == "Attack") or (i.suit == "\u2665") or (i.suit == "\u2666"):
                             possible_cards.append(i)
@@ -1467,9 +1472,12 @@ class Player:
                             serp_spear = self.check_weapon_serpent_spear()
                             attack = serp_spear[0]
                         elif attack in self.equipment:
+                            self.check_warrior_saint(attack)
                             self.equipment.remove(attack)
                             discard_deck.add_to_top(attack)
                         else:
+                            self.check_dragon_heart_defend_to_attack(attack)
+                            self.check_warrior_saint(attack)
                             self.hand.contents.remove(attack)
                             discard_deck.add_to_top(attack)
                         self.check_one_after_another()
@@ -1496,12 +1504,12 @@ class Player:
                             return defend
 
                 # Check all possible cards
-                if self.check_dragon_heart():
+                if ("Dragon Heart:" in self.char_abils):
                     for i in self.hand.contents:
                         if (i.effect == "Defend") or (i.effect == "Attack"):
                             possible_cards.append(i)
 
-                elif self.check_impetus():
+                elif ("Impetus:" in self.char_abils):
                     for i in self.hand.contents:
                         if (i.effect == "Defend") or (i.suit == "\u2660") or (i.suit == "\u2663"):
                             possible_cards.append(i)
@@ -1517,6 +1525,8 @@ class Player:
                     activated = random.choice(choices)
                     if activated:
                         defend = random.choice(possible_cards)
+                        self.check_dragon_heart_attack_to_defend(defend)
+                        self.check_impetus(defend)
                         self.hand.contents.remove(defend)
                         discard_deck.add_to_top(defend)
                         self.check_one_after_another()
@@ -1534,12 +1544,12 @@ class Player:
                     possible_cards = []
 
                     # Check all possible cards
-                    if self.check_dragon_heart():
+                    if ("Dragon Heart:" in self.char_abils):
                         for i in self.hand.contents:
                             if (i.effect == "Attack") or (i.effect == "Defend"):
                                 possible_cards.append(i)
 
-                    elif self.check_warrior_saint():
+                    elif ("Warrior Saint:" in self.char_abils):
                         for i in self.hand.contents:
                             if (i.effect == "Attack") or (i.suit == "\u2665") or (i.suit == "\u2666"):
                                 possible_cards.append(i)
@@ -1572,10 +1582,14 @@ class Player:
                                 required -= 1
 
                             elif attack in self.equipment:
+                                self.check_warrior_saint(attack)
                                 self.equipment.remove(attack)
                                 discard_deck.add_to_top(attack)
 
                             else:
+                                self.check_dragon_heart_defend_to_attack(
+                                    attack)
+                                self.check_warrior_saint(attack)
                                 self.hand.contents.remove(attack)
                                 discard_deck.add_to_top(attack)
                                 print(
@@ -1636,12 +1650,12 @@ class Player:
                                                 return defend
 
                     # Check all possible cards
-                    if self.check_dragon_heart():
+                    if ("Dragon Heart:" in self.char_abils):
                         for i in self.hand.contents:
                             if (i.effect == "Defend") or (i.effect == "Attack"):
                                 possible_cards.append(i)
 
-                    elif self.check_impetus():
+                    elif ("Impetus:" in self.char_abils):
                         for i in self.hand.contents:
                             if (i.effect == "Defend") or (i.suit == "\u2660") or (i.suit == "\u2663"):
                                 possible_cards.append(i)
@@ -1657,6 +1671,8 @@ class Player:
                         activated = random.choice(choices)
                         if activated:
                             defend = random.choice(possible_cards)
+                            self.check_dragon_heart_attack_to_defend(defend)
+                            self.check_impetus(defend)
                             self.hand.contents.remove(defend)
                             discard_deck.add_to_top(defend)
                             self.check_one_after_another()
@@ -1678,6 +1694,9 @@ class Player:
         # 'attacker' refers to the source of the Attack (Coerce causes this to vary!)
         # 'card2' refers to any secondary 'Attack' cards used; this is used when there are any special effects (such as Serpent Spear)
         self.attacks_this_turn += 1
+
+        # Early reactionary abilities
+        target = target.check_displacement(self)
 
         # Weapon and Black Shield checks
         self.check_weapon_gender_swords(target)
@@ -1722,8 +1741,8 @@ class Player:
 
             target.current_health -= damage_dealt
             print(f"{self.character} attacked {target.character}, dealing {damage_dealt} damage ({target.current_health}/{target.max_health} HP remaining).")
-            target.check_evil_hero(card, card2)
             self.check_weapon_huangs_longbow(target)
+            target.check_evil_hero(card, card2)
             for player in players:
                 if player.current_health < 1:
                     if player.check_brink_of_death_loop(self) == "Break":
@@ -1733,12 +1752,12 @@ class Player:
         # 'target' refers to the player that will potentially be attacked by the coerced player!
         possible_cards = []
 
-        if self.check_dragon_heart():
+        if ("Dragon Heart:" in self.char_abils):
             for i in self.hand.contents:
                 if (i.effect == "Attack") or (i.effect == "Defend"):
                     possible_cards.append(i)
 
-        elif self.check_warrior_saint():
+        elif ("Warrior Saint:" in self.char_abils):
             for i in self.hand.contents:
                 if (i.effect == "Attack") or ((i.suit == "\u2665") or (i.suit == "\u2666")):
                     possible_cards.append(i)
@@ -1768,8 +1787,11 @@ class Player:
                     return self.activate_attack(serp_spear[0], target, serp_spear[1])
                 else:
                     if card in self.equipment:
+                        self.check_warrior_saint(card)
                         self.equipment.remove(card)
                     else:
+                        self.check_dragon_heart_defend_to_attack(card)
+                        self.check_warrior_saint(card)
                         self.hand.contents.remove(card)
                     discard_deck.add_to_top(card)
                     card.effect2 = "Attack"
@@ -2119,7 +2141,11 @@ class Player:
 
         # Reset Abilities
         self.used_bare_the_chest = False
+        self.used_benevolence = False
         self.used_dual_heroes = False
+        self.used_green_salve = False
+        self.used_reconsider = False
+        self.used_seed_of_animosity = False
 
     # Equipment Checks
     def check_armor_black_shield(self, card):
@@ -2240,7 +2266,7 @@ class Player:
                             f"  >> {self.character} has forced {target.character} to discard {card}!")
                         total_cards -= 1
 
-                    self.check_one_after_another()
+                    target.check_one_after_another()
                     return True
         return False
 
@@ -2408,6 +2434,7 @@ class Player:
                     cards_viewed = 5
                 astrology = Player()
                 astrology.draw(main_deck, cards_viewed, False)
+
                 for i in range(cards_viewed):
                     card = random.choice(astrology.hand.contents)
                     astrology.hand.contents.remove(card)
@@ -2431,6 +2458,25 @@ class Player:
                     f"  >> Character Ability: Bare the Chest; {self.character} has activated Bare the Chest, drawing one card only, and all their ATTACK and DUEL cards will do increased damage for this turn.")
                 self.used_bare_the_chest = True
                 return True
+
+    def check_benevolence(self):
+        # "Benevolence: You can give any number of your hand-cards to any players. If you give away more than one card, you recovers one unit of health."
+        if ("Benevolence:" in self.char_abils) and (self.used_benevolence == False):
+            total_cards = len(self.hand.contents)
+            if total_cards > 0:
+                self.used_benevolence = True
+                target = random.choice(players[1:])
+                cards_given = random.randint(1, total_cards)
+                for i in range(cards_given):
+                    card = random.choice(total_cards)
+                    self.hand.contents.remove(card)
+                    target.hand.append(card)
+                print(
+                    f"  >> Character Ability: Benevolence; {self.character} has given {cards_given} cards to {target.character}!")
+                if (cards_given > 1) and (self.max_health > self.current_health):
+                    self.current_health += 1
+                    print(
+                        f"  >> Character Ability: Benevolence; {self.character} recovers one unit of health ({self.current_health}/{self.max_health} HP remaining)!")
 
     def check_berserk(self):
         # "Berserk: There is no limit on how many times you can ATTACK during your turn."
@@ -2461,10 +2507,41 @@ class Player:
                 f"  >> Character Ability: Dashing Hero; {self.character} draws an extra card from the deck (total of 3) in their drawing phase.")
             return True
 
-    def check_dragon_heart(self):
-        # "Dragon Heart: Your ATTACK and DEFEND cards can be used interchangeably."
+    def check_displacement(self, source):
+        # --- "Displacement: Whenever you become the target of an ATTACK, you can discard any card to divert the ATTACK to any player within your attacking range. This effect cannot be used against the player that played the ATTACK card."
+        # 'source' refers to the source of the ATTACK
+        if "Displacement:" in self.char_abils:
+            targets = self.calculate_targets_in_weapon_range(0, source)
+            if (len(targets) > 0) and ((len(self.hand.contents) + len(self.equipment)) > 0):
+                choices = [True, False]
+                activated = random.choice(choices)
+                if activated:
+                    card = self.discard("Handquip")
+                    target = random.choice(targets)
+                    print(
+                        f"  >> Character Ability: Displacement; {self.character} has discarded {card} to redirect the ATTACK to {target.character}.")
+                    return target
+        return self
+
+    def check_dragon_heart_attack_to_defend(self, card):
+        # --- "Dragon Heart: Your ATTACK and DEFEND cards can be used interchangeably."
+        # 'card' refers to the card used as an ATTACK
         if "Dragon Heart:" in self.char_abils:
-            return True
+            if card.effect == "Attack":
+                card.effect2 = "Defend"
+                print(
+                    f"  >> Character Ability: Dragon Heart; {self.character} used {card} as a DEFEND!")
+                return True
+
+    def check_dragon_heart_defend_to_attack(self, card):
+        # "Dragon Heart: Your ATTACK and DEFEND cards can be used interchangeably."
+        # 'card' refers to the card used as a DEFEND
+        if "Dragon Heart:" in self.char_abils:
+            if card.effect == "Defend":
+                card.effect2 = "Attack"
+                print(
+                    f"  >> Character Ability: Dragon Heart; {self.character} used {card} as an ATTACK!")
+                return True
 
     def check_dual_heroes(self):
         # "Dual Heroes: At the beginning of your turn, you can choose to forgo your drawing phase and instead flip a judgement. Unlike usual judgement cards, this card will be added to your hand. Note the colour of the suit of this judgement card. For the rest of your action phase, you can choose to use any on-hand card with a different colour suit from this judgement card as a DUEL."
@@ -2603,16 +2680,20 @@ class Player:
                         target.current_health -= damage_dealt
                         print(
                             f"  >> Character Ability: Fearsome Archer; {self.character} attacked {target.character} with an undodgable ATTACK, dealing {damage_dealt} damage. ({target.current_health}/{target.max_health} HP remaining).")
-                        self.check_evil_hero(card, card2)
                         self.check_weapon_huangs_longbow(target)
+                        self.check_evil_hero(card, card2)
                         for player in players:
                             if player.current_health < 1:
                                 player.check_brink_of_death_loop(self)
                         return True
 
-    def check_first_aid(self):
+    def check_first_aid(self, card):
         # "First Aid: Outside of your turn, you can use any red-suited cards (on-hand or equipped) as a PEACH."
         if "First Aid:" in self.char_abils:
+            if (card.suit == "\u2665") or (card.suit == "\u2666"):
+                print(
+                    f"  >> Character Ability: First Aid; {self.character} used {card} as a PEACH!")
+                card.effect2 = "Peach"
             return True
 
     def check_goddess_luo(self):
@@ -2637,6 +2718,21 @@ class Player:
                 for card in cards_drawn:
                     self.hand.contents.append(card)
 
+    def check_green_salve(self):
+        # "Green Salve: During your action phase, you can discard any card and allow any player to regain one unit of health. Limited to one use per turn."
+        if ("Green Salve:" in self.char_abils) and (self.used_green_salve == False):
+            targets = []
+            for player in players:
+                if player.max_health > player.current_health:
+                    targets.append(player)
+            if len(targets) > 0:
+                self.used_green_salve = True
+                card = self.discard("Handquip")
+                target = random.choice(targets)
+                target.current_health += 1
+                print(
+                    f"  >> Character Ability: Green Salve; {self.character} has used {card} to heal {target.character} by one ({target.current_health}/{target.max_health} HP remaining)!")
+
     def check_horsemanship(self):
         # "Horsemanship: You will always be -1 distance in any range calculations."
         if "Horsemanship:" in self.char_abils:
@@ -2647,10 +2743,14 @@ class Player:
         if "Humility:" in self.char_abils:
             return True
 
-    def check_impetus(self):
+    def check_impetus(self, card):
         # "Impetus: Every one of your black-suited on-hand cards may be used as DEFEND."
         if "Impetus:" in self.char_abils:
-            return True
+            if (card.suit == "\u2660") or (card.suit == "\u2663"):
+                print(
+                    f"  >> Character Ability: Impetus; {self.character} used {card} as DEFEND!")
+                card.effect2 = "Defend"
+                return True
 
     def check_iron_cavalry(self, card, card2=None, target=None):
         # --- "Iron Cavalry: Whenever you ATTACK a player, you can flip a judgement card. If it is red, the ATTACK cannot be dodged."
@@ -2674,6 +2774,7 @@ class Player:
                     damage_dealt = 1
                     print(f"{self.character}'s judgement card is a {judgement_card} and therefore the ATTACK cannot be dodged, dealing {damage_dealt} damage to {target.character}. ({target.current_health}/{target.max_health} HP remaining).")
                     self.check_weapon_huangs_longbow(target)
+                    target.check_evil_hero(card, card2)
                     for player in players:
                         if player.current_health < 1:
                             if player.check_brink_of_death_loop(self) == "Break":
@@ -2704,9 +2805,13 @@ class Player:
                 return True
         return False
 
-    def check_national_colours(self):
-        # "National Colours: During your action phase, you can use any of your cards (on-hand or equipped) with a \u2666 suit as ACEDIA."
+    def check_national_colours(self, card):
+        # --- "National Colours: During your action phase, you can use any of your cards (on-hand or equipped) with a \u2666 suit as ACEDIA."
+        # 'card' refers to the card being used as an ACEDIA
         if "National Colours:" in self.char_abils:
+            print(
+                f"  >> Character Ability: National Colours; {self.character} has used {card} as ACEDIA.")
+            card.effect2 = "Acedia"
             return True
 
     def check_one_after_another(self):
@@ -2753,20 +2858,16 @@ class Player:
                     return True
         return False
 
-    def check_random_strike(self):
-        # "Random Strike: You can use any two hand-cards which have the same suit as RAIN OF ARROWS."
-        output = []
+    def check_random_strike(self, card, card2):
+        # --- "Random Strike: You can use any two hand-cards which have the same suit as RAIN OF ARROWS."
+        # 'card' refers to the first card being used as RAIN OF ARROWS
+        # 'card2' refers to the second card being used as RAIN OF ARROWS
         if "Random Strike:" in self.char_abils:
-            same_cards = {"\u2660": 0, "\u2663": 0, "\u2665": 0, "\u2666": 0}
-            for i in self.hand.contents:
-                card_suit = i.suit
-                same_cards[card_suit] += 1
-
-            for suit in same_cards:
-                if same_cards[suit] > 1:
-                    output.append(suit)
-
-        return output
+            print(
+                f"  >> Character Ability: Random Strike; {self.character} used {card}/{card2} as RAIN OF ARROWS!")
+            card.effect2 = "Rain of Arrows"
+            card2.effect2 = "Rain of Arrows"
+            return True
 
     def check_reckless(self, card):
         # --- "Reckless: Every instance that you suffer damage from a red-suited ATTACK, or a WINE ATTACK, your maximum health limit is reduced by one instead."
@@ -2782,6 +2883,24 @@ class Player:
                     if player.current_health < 1:
                         player.check_brink_of_death_loop(self)
                 return True
+
+    def check_reconsider(self):
+        # "Reconsider: You can discard any number of cards to then draw the same number. Limited to one use per turn."
+        if ("Reconsider:" in self.char_abils) and (self.used_reconsider == False):
+            total_cards = len(self.hand.contents) + len(self.equipment)
+            if total_cards > 0:
+                self.used_reconsider = True
+                cards_changed = random.randint(1, total_cards)
+                for i in range(cards_changed):
+                    card = random.choice(total_cards)
+                    if card in self.equipment:
+                        self.equipment.remove(card)
+                    else:
+                        self.hand.contents.remove(card)
+                    discard_deck.add_to_top(card)
+                self.draw(main_deck, cards_changed, True)
+                print(
+                    f"  >> Character Ability: Reconsider; {self.character} has discarded {cards_changed}, then drew the same amount!")
 
     def check_rescued(self, healer):
         # --- "Rescued (Ruler Ability): Whenever another member of Wu uses a PEACH to save you from the brink of death, it provides you with two units of health."
@@ -2802,9 +2921,35 @@ class Player:
                     f"  >> Character Ability: Restraint; {self.character} skips their discard phase.")
                 return True
 
-    def check_surprise(self):
-        # "Surprise: During your action phase, you can use any of your black-suited cards (on-hand or equipped) as DISMANTLE."
+    def check_seed_of_animosity(self):
+        # "Seed of Animosity: During your action phase, you can discard one card (on-hand or equipped) and select two male characters to undergo a DUEL with eachother. This ability cannot be prevented using NEGATE, and is limited to one use per turn."
+        if ("Seed of Animosity:" in self.char_abils) or (self.used_seed_of_animosity == False):
+            targets = []
+            for player in players[1:]:
+                if player.gender == "Male":
+                    targets.append
+            if len(targets) > 1:
+                self.used_seed_of_animosity = True
+                card = self.discard("Handquip")
+                target1 = random.choice(targets)
+                targets.remove(target1)
+                target2 = random.choice(targets)
+                if target2.check_empty_city():
+                    print(
+                        f"  >> Character Ability: Seed of Animosity; {self.character} has forced {target2.character} to DUEL against {target1.character}!")
+                    target2.activate_duel(card, target1)
+                else:
+                    print(
+                        f"  >> Character Ability: Seed of Animosity; {self.character} has forced {target1.character} to DUEL against {target2.character} by discarding {card}!")
+                    target1.activate_duel(card, target2)
+
+    def check_surprise(self, card):
+        # --- "Surprise: During your action phase, you can use any of your black-suited cards (on-hand or equipped) as DISMANTLE."
+        # 'card' refers to the card being used as an DISMANTLE
         if "Surprise:" in self.char_abils:
+            print(
+                f"  >> Character Ability: Surprise; {self.character} has used {card} as DISMANTLE.")
+            card.effect2 = "Dismantle"
             return True
 
     def check_talent(self):
@@ -2812,10 +2957,27 @@ class Player:
         if "Talent:" in self.char_abils:
             return True
 
-    def check_warrior_saint(self):
+    def check_trojan_flesh(self):
+        # "Trojan Flesh: During your action phase, you can choose to lose one unit of health to draw two more cards from the deck. This ability can be used repeatedly in a turn."
+        if "Trojan Flesh" in self.char_abils:
+            print(
+                f"  >> Character Ability: Trojan Flesh; {self.character} lost one health to draw two cards from the deck ({self.current_health}/{self.max_health} HP remaining).")
+            self.current_health -= 1
+            if self.current_health < 1:
+                if self.current_health < 1:
+                    self.check_brink_of_death_loop(self)
+            else:
+                self.draw(main_deck, 2, False)
+
+    def check_warrior_saint(self, card):
         # "Warrior Saint: You can use any red-suited cards (on-hand or equipped) as an ATTACK."
+        # 'card' refers to the card being used as an ATTACK
         if "Warrior Saint:" in self.char_abils:
-            return True
+            if (card.suit == "\u2665") or (card.suit == "\u2666"):
+                print(
+                    f"  >> Character Ability: Warrior Saint; {self.character} has used {card} as ATTACK.")
+                card.effect2 = "Attack"
+                return True
 
     def check_warrior_woman(self):
         # "Warrior Woman: Whenever any equipped card is removed from your equipment, you can immediately draw two cards from the deck."
@@ -2905,18 +3067,36 @@ class Player:
 
             actions = self.hand.contents + ["End Action-Phase"]
 
-            # Ability Checks
-            suits = self.check_random_strike()
-
-            if self.check_national_colours():
+            # Ability Checks; (adding extra actions!)
+            if ("Benevolence:" in self.char_abils) and (self.used_benevolence == False):
+                actions.append("benevolence")
+            elif ("Green Salve:" in self.char_abils):
+                actions.append("green_salve")
+            elif ("National Colours:" in self.char_abils):
                 for i in self.equipment:
                     if i.suit == "\u2666":
                         actions.append(i)
-            elif self.check_surprise():
+            elif ("Seed of Animosity:" in self.char_abils) and (self.used_seed_of_animosity == False):
+                actions.append("seed_of_animosity")
+            elif ("Surprise:" in self.char_abils):
                 for i in self.equipment:
                     if (i.suit == "\u2660") or (i.suit == "\u2663"):
                         actions.append(i)
-            elif self.check_warrior_saint():
+            elif ("Random Strike:" in self.char_abils):
+                suits = []
+                same_cards = {"\u2660": 0, "\u2663": 0,
+                              "\u2665": 0, "\u2666": 0}
+                for i in self.hand.contents:
+                    card_suit = i.suit
+                    same_cards[card_suit] += 1
+                for suit in same_cards:
+                    if same_cards[suit] > 1:
+                        suits.append(suit)
+            elif ("Reconsider:" in self.char_abils):
+                actions.append("reconsider")
+            elif ("Trojan Flesh:" in self.char_abils):
+                actions.append("trojan_flesh")
+            elif ("Warrior Saint:" in self.char_abils):
                 for i in self.equipment:
                     if (i.suit == "\u2665") or (i.suit == "\u2666"):
                         actions.append(i)
@@ -2942,6 +3122,21 @@ class Player:
                 serp_spear = self.check_weapon_serpent_spear()
                 self.use_card_effect(serp_spear[0], serp_spear[1])
 
+            elif card == "benevolence":
+                self.check_benevolence()
+
+            elif card == "green_salve":
+                self.check_green_salve()
+
+            elif card == "reconsider":
+                self.check_reconsider()
+
+            elif card == "seed of animosity":
+                self.check_seed_of_animosity()
+
+            elif card == "trojan_flesh":
+                self.check_trojan_flesh()
+
             else:
                 activated = False
                 card2 = None
@@ -2951,15 +3146,19 @@ class Player:
                     choices = [True, False]
                     activated = random.choice(choices)
                     if activated:
+                        print(
+                            f"  >> Character Ability: Dual Heroes; {self.character} uses {card} as DUEL!")
                         card.effect2 = "Duel"
 
                 elif (self.used_dual_heroes == "Red") and ((card.suit == "\u2665") or (card.suit == "\u2666")):
                     choices = [True, False]
                     activated = random.choice(choices)
                     if activated:
+                        print(
+                            f"  >> Character Ability: Dual Heroes; {self.character} uses {card} as DUEL!")
                         card.effect2 = "Duel"
 
-                elif (self.check_random_strike()) and (card.suit in suits):
+                elif ("Random Strike:" in self.char_abils) and (card.suit in suits):
                     choices = [True, False]
                     activated = random.choice(choices)
                     if activated:
@@ -2968,26 +3167,25 @@ class Player:
                             if (i != card) and (i.suit == card.suit):
                                 possible_cards.append(i)
                         card2 = random.choice(possible_cards)
-                        card.effect2 = "Rain of Arrows"
-                        card2.effect2 = "Rain of Arrows"
+                        self.check_random_strike(card, card2)
 
-                elif (self.check_national_colours()) and (card.suit == "\u2666"):
+                elif ("National Colours:" in self.char_abils) and (card.suit == "\u2666"):
                     choices = [True, False]
                     activated = random.choice(choices)
                     if activated:
-                        card.effect2 = "Acedia"
+                        self.check_national_colours(card)
 
-                elif (self.check_surprise()) and ((card.suit == "\u2660") or (card.suit == "\u2663")):
+                elif ("Surprise:" in self.char_abils) and ((card.suit == "\u2660") or (card.suit == "\u2663")):
                     choices = [True, False]
                     activated = random.choice(choices)
                     if activated:
-                        card.effect2 = "Dismantle"
+                        self.check_surprise(card)
 
-                elif (self.check_warrior_saint()) and ((card.suit == "\u2665") or (card.suit == "\u2666")):
+                elif ("Warrior Saint:" in self.char_abils) and ((card.suit == "\u2665") or (card.suit == "\u2666")):
                     choices = [True, False]
                     activated = random.choice(choices)
                     if activated:
-                        card.effect2 = "Attack"
+                        self.check_warrior_saint(card)
 
                 # Otherwise, use normal card-effect
                 if not activated:
