@@ -8,21 +8,16 @@
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
 Current Version: 29/11/2020
-Version 2.05
+Version 2.06
 
- + 29/11/2020 (v2.05);
- - Post-damage retaliatory abilities to now check if current_health > 0, and apply after Brink of Death loop
- - 3 abilities to go...
+ + 29/11/2020 (v2.06);
+ - CPUs can now play with character-cards at random (largely untested)
  - Implementation of following characters and abilities:
-    - Guo Jia: Bequeathed Strategy
-    - Liu Bei: Rouse (Ruler Ability)
-    - Sima Yi: Devil
-    - Sima Yi: Retaliation
-    - Sun Shang Xiang: Marriage
-    - Xiahou Dun: Eye for an Eye
+    - Cao Cao: Escort
+    - Dian Wei: Ferocious Assault
+    - Zhou Yu: Sow Dissension
 
  TO DO:
- - All base-characters (x32)
  - Ability to play vs CPU (random moves)
  - Ability to connect and play vs other players
 """
@@ -379,41 +374,77 @@ def generate_roles(num):
     return roles_dict
 
 
-def generate_players(num):
+def generate_players(num, chars):
     # 'num' refers to the number of players you want to generate
+    # 'chars' refers to if character-cards are being used
     global roles_dict
-
     if num > 10:
         num = 10
     if 3 > num:
         num = 3
 
-    char_names = ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"]
-    genders = ["Male", "Male", "Male", "Male", "Male",
-               "Female", "Female", "Female", "Female", "Female"]
-    random.shuffle(genders)
+    if chars:
+        (all_emperors, all_characters) = generate_character_cards()
 
-    if roles != 0:
-        roles_dict = generate_roles(num)
-        roles_list = []
-        for key in roles_dict.keys():
-            for i in range(0, roles_dict[key]):
-                roles_list.append(key)
+        if roles != 0:
+            roles_dict = generate_roles(num)
+            roles_list = []
+            for key in roles_dict.keys():
+                for i in range(0, roles_dict[key]):
+                    roles_list.append(key)
 
-        random.shuffle(roles_list)
-        roles_list.append(roles_list.pop(roles_list.index("Emperor")))
+            random.shuffle(roles_list)
+            roles_list.append(roles_list.pop(roles_list.index("Emperor")))
 
-        players = [Player(genders.pop(0), roles_list.pop())
-                   for player_number in range(num)]
+            players = [Player((None), roles_list.pop())
+                       for player_number in range(num)]
+
+        else:
+            players = [Player() for player_number in range(num)]
+
+        for player in players:
+            if player.role == "Emperor":
+                char = random.choice(all_emperors)
+            else:
+                char = random.choice(all_characters)
+            player.character = char.character
+            player.allegiance = char.allegiance
+            player.current_health = char.health
+            player.max_health = char.health
+            player.gender = char.gender
+            player.char_abils = char.char_abils
+            if (num > 4) and (player.role == "Emperor"):
+                player.current_health += 1
+                player.max_health += 1
 
     else:
-        players = [Player(genders.pop(0)) for player_number in range(num)]
+        char_names = ["p0", "p1", "p2", "p3",
+                      "p4", "p5", "p6", "p7", "p8", "p9"]
+        genders = ["Male", "Male", "Male", "Male", "Male",
+                   "Female", "Female", "Female", "Female", "Female"]
+        random.shuffle(genders)
 
-    for player in players:
-        player.character = char_names.pop(0)
-        if (num > 4) and (player.role == "Emperor"):
-            player.current_health += 1
-            player.max_health += 1
+        if roles != 0:
+            roles_dict = generate_roles(num)
+            roles_list = []
+            for key in roles_dict.keys():
+                for i in range(0, roles_dict[key]):
+                    roles_list.append(key)
+
+            random.shuffle(roles_list)
+            roles_list.append(roles_list.pop(roles_list.index("Emperor")))
+
+            players = [Player(genders.pop(0), roles_list.pop())
+                       for player_number in range(num)]
+
+        else:
+            players = [Player(genders.pop(0)) for player_number in range(num)]
+
+        for player in players:
+            player.character = char_names.pop(0)
+            if (num > 4) and (player.role == "Emperor"):
+                player.current_health += 1
+                player.max_health += 1
 
     return players
 
@@ -432,11 +463,12 @@ def check_win_conditions():
         return False
 
 
-def play_games(num_players, num_iterations, lightning_dmg=3, mode=1):
+def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True):
     # 'num_players' refers to the number of players
     # 'iterations' refers to the number of iterations that the game will run
     # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning // 3 by default
     # 'mode' refers to whether there are any player roles in-game // 0 = all rebels, 1 = normal roles, 2 = more spies
+    # 'chars' refers to whether character cards will be used in game // True by default
     emp_and_co_wins = 0
     spy_wins = 0
     rebel_wins = 0
@@ -459,7 +491,7 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1):
             mode = 0
         roles = mode
 
-        players = generate_players(num_players)
+        players = generate_players(num_players, chars)
         players_at_start = []
         for player in players:
             players_at_start.append(player)
@@ -847,6 +879,8 @@ class Player:
 
             while len(self.pending_judgements) > 0:
                 discard_deck.add_to_top(self.pending_judgements.pop())
+        else:
+            self.check_one_after_another()
 
     # Using Cards/Effects
     def use_card_effect(self, card, card2=None):
@@ -1504,10 +1538,58 @@ class Player:
                         for player in players:
                             player.rouse_requested = False
 
-                return [attack, attack2]
+                return attack, attack2
 
             elif response_required == "Escort Defend":
-                pass
+                defend = 0
+                possible_cards = []
+
+                # Check for Eight Trigrams
+                armor = False
+                for eight_trigrams in self.equipment:
+                    if eight_trigrams.effect == "Eight-Trigrams":
+                        armor = True
+                        break
+                if armor:
+                    choices = [True, False]
+                    activated = random.choice(choices)
+                    if activated:
+                        defend = self.check_armor_eight_trigrams()
+                        if type(defend) == Card:
+                            return defend
+
+                # Check all possible cards
+                if ("Dragon Heart:" in self.char_abils):
+                    for i in self.hand.contents:
+                        if (i.effect == "Defend") or (i.effect == "Attack"):
+                            possible_cards.append(i)
+
+                elif ("Impetus:" in self.char_abils):
+                    for i in self.hand.contents:
+                        if (i.effect == "Defend") or (i.suit == "\u2660") or (i.suit == "\u2663"):
+                            possible_cards.append(i)
+
+                else:
+                    for i in self.hand.contents:
+                        if i.effect == "Defend":
+                            possible_cards.append(i)
+
+                # Choice of activation of response, and subsequent choice of card
+                if len(possible_cards) > 0:
+                    choices = [True, False]
+                    activated = random.choice(choices)
+                    if activated:
+                        defend = random.choice(possible_cards)
+                        self.check_dragon_heart_atk_to_def(defend)
+                        self.check_impetus(defend)
+                        self.hand.contents.remove(defend)
+                        discard_deck.add_to_top(defend)
+                        self.check_one_after_another()
+                        defend.effect2 = "Defend"
+                        for player in players:
+                            player.escort_requested = False
+
+                return defend
 
             elif response_required == "Attack" and card.effect2 == "Barbarians":
                 attack = 0
@@ -1613,6 +1695,18 @@ class Player:
                         if (i.effect == "Defend") or (i.effect == "Attack"):
                             possible_cards.append(i)
 
+                elif ("Escort (Ruler Ability):" in self.char_abils) and ((self.role == "Emperor") or ("False Ruler:" in self.char_abils)):
+                    for i in self.hand.contents:
+                        if i.effect == "Defend":
+                            possible_cards.append(i)
+                    targets = []
+                    for player in players:
+                        if (player != self) and (player.allegiance == "Wei"):
+                            if (player.escort_requested == False):
+                                targets.append(player)
+                    if len(targets) > 0:
+                        possible_cards.append("Escort")
+
                 elif ("Impetus:" in self.char_abils):
                     for i in self.hand.contents:
                         if (i.effect == "Defend") or (i.suit == "\u2660") or (i.suit == "\u2663"):
@@ -1635,6 +1729,8 @@ class Player:
                         discard_deck.add_to_top(defend)
                         self.check_one_after_another()
                         defend.effect2 = "Defend"
+                        for player in players:
+                            player.escort_requested = False
 
                 return defend
 
@@ -1763,6 +1859,8 @@ class Player:
                             defend = self.check_armor_eight_trigrams()
                             if type(defend) == Card:
                                 required -= 1
+                                for player in players:
+                                    player.escort_requested = False
                                 if required == 0:
                                     return defend
                                 else:
@@ -1772,6 +1870,8 @@ class Player:
                                         defend = self.check_armor_eight_trigrams()
                                         if type(defend) == Card:
                                             required -= 1
+                                            for player in players:
+                                                player.escort_requested = False
                                             if required == 0:
                                                 return defend
 
@@ -1780,6 +1880,18 @@ class Player:
                         for i in self.hand.contents:
                             if (i.effect == "Defend") or (i.effect == "Attack"):
                                 possible_cards.append(i)
+
+                    elif ("Escort (Ruler Ability):" in self.char_abils) and ((self.role == "Emperor") or ("False Ruler:" in self.char_abils)):
+                        for i in self.hand.contents:
+                            if i.effect == "Defend":
+                                possible_cards.append(i)
+                        targets = []
+                        for player in players:
+                            if (player != self) and (player.allegiance == "Wei"):
+                                if (player.escort_requested == False):
+                                    targets.append(player)
+                        if len(targets) > 0:
+                            possible_cards.append("Escort")
 
                     elif ("Impetus:" in self.char_abils):
                         for i in self.hand.contents:
@@ -1804,6 +1916,8 @@ class Player:
                             self.check_one_after_another()
                             defend.effect2 = "Defend"
                             required -= 1
+                            for player in players:
+                                player.escort_requested = False
                             if required == 0:
                                 return defend
                     else:
@@ -2295,10 +2409,12 @@ class Player:
         self.used_bare_the_chest = False
         self.used_benevolence = False
         self.used_dual_heroes = False
+        self.used_ferocious_assault = False
         self.used_green_salve = False
         self.used_marriage = False
         self.used_reconsider = False
         self.used_seed_of_animosity = False
+        self.used_sow_dissension = False
 
         self.escort_requested = False
         self.rouse_requested = False
@@ -2687,7 +2803,7 @@ class Player:
                 limit_increase = ((len(heroes)-1)*2)
                 if limit_increase > 0:
                     print(
-                        f"  >> Character Ability: Bloodline (Ruler Ability); {self.character}'s hand limit is increased by {limit_increase} (two for every other HERO character still alive).")
+                        f"  >> Ruler Ability: Bloodline; {self.character}'s hand limit is increased by {limit_increase} (two for every other HERO character still alive).")
         return limit_increase
 
     def check_dashing_hero(self):
@@ -2796,6 +2912,27 @@ class Player:
             print(
                 f"  >> Character Ability: Envy of Heaven; The top judgement card has been added to {self.character}'s hand before it takes effect.")
             self.draw(discard_deck, 1, False)
+
+    def check_escort(self):
+        # "Escort (Ruler Ability): If you need to use a DEFEND, you can ask any member of Wei to play it on your behalf."
+        if ("Escort (Ruler Ability):" in self.char_abils) and ((self.role == "Emperor") or ("False Ruler:" in self.char_abils)):
+            targets = []
+            for player in players:
+                if (player != self) and (player.allegiance == "Wei"):
+                    if (player.escort_requested == False):
+                        targets.append(player)
+            if len(targets) > 0:
+                target = random.choice(targets)
+                card = target.use_reaction_effect("Escort Defend")
+                if type(card) == Card:
+                    if (card.effect == "Defend") or (card.effect2 == "Defend"):
+                        print(
+                            f"  >> Ruler Ability: Escort; {target.character} played a DEFEND ({card}) on behalf of {self.character}!")
+                        return card
+                print(
+                    f"  >> Ruler Ability: Escort; {target.character} did not play a DEFEND on behalf of {self.character}!")
+                target.escort_requested = True
+        return "Repeat"
 
     def check_evil_hero(self, card, card2=None):
         # --- "Evil Hero: Whenever you are damaged by a card, you can immediately add it to your hand."
@@ -2932,6 +3069,47 @@ class Player:
                         target.check_eye_for_an_eye(self)
                         target.check_retaliation(self, damage_dealt)
                         return True
+
+    def check_ferocious_assault(self):
+        # "Ferocious Assault: During your action phase, you can inflict one unit of damage to any player within your attacking range by either; reducing one unit of your own health, or discarding one weapon card (on-hand or equipped). Limited to one use per turn."
+        if ("Ferocious Assault:" in self.char_abils) and (self.used_ferocious_assault == False):
+            weapon_targets = self.calculate_targets_in_weapon_range()
+            if len(weapon_targets) > 0:
+                total_cards = self.hand.contents + self.equipment
+                choices = ["Health"]
+                possible_weapons = []
+                for i in total_cards:
+                    if i.ctype == "Weapon":
+                        if "Weapon" not in choices:
+                            choices.append("Weapon")
+                        possible_weapons.append(i)
+
+                mode = random.choice(choices)
+                target = random.choice(players[1:])
+                if mode == "Health":
+                    self.current_health -= 1
+                    target.current_health -= 1
+                    print(
+                        f"  >> Character Ability: Ferocious Assault; {self.character} has lost 1 health to damage {target.character} ({target.current_health}/{target.max_health} HP remaining)!")
+                    self.check_brink_of_death_loop(None)
+
+                elif mode == "Weapon":
+                    weapon = random.choice(possible_weapons)
+                    if weapon in self.equipment:
+                        self.equipment.remove(weapon)
+                    else:
+                        self.hand.contents.remove(weapon)
+                    discard_deck.add_to_top(weapon)
+                    print(
+                        f"  >> Character Ability: Ferocious Assault; {self.character} has discarded {weapon} to damage {target.character} ({target.current_health}/{target.max_health} HP remaining)!")
+                    target.current_health -= 1
+                    target.check_brink_of_death_loop(self)
+
+                target.check_brink_of_death_loop(self)
+                target.check_bequeathed_strategy(1)
+                target.check_eye_for_an_eye(self)
+                target.check_retaliation(self, 1)
+                self.used_ferocious_assault = True
 
     def check_first_aid(self, card):
         # "First Aid: Outside of your turn, you can use any red-suited cards (on-hand or equipped) as a PEACH."
@@ -3185,7 +3363,7 @@ class Player:
             if self != healer:
                 if healer.allegiance == "Wu":
                     print(
-                        f"  >> Character Ability: Rescued (Ruler Ability): {self.character} was saved from the brink of death by a member of Wu, and therefore recovers two health!")
+                        f"  >> Ruler Ability: Rescued: {self.character} was saved from the brink of death by a member of Wu, and therefore recovers two health!")
                     return 1
         return 0
 
@@ -3253,7 +3431,7 @@ class Player:
 
     def check_seed_of_animosity(self):
         # "Seed of Animosity: During your action phase, you can discard one card (on-hand or equipped) and select two male characters to undergo a DUEL with eachother. This ability cannot be prevented using NEGATE, and is limited to one use per turn."
-        if ("Seed of Animosity:" in self.char_abils) or (self.used_seed_of_animosity == False):
+        if ("Seed of Animosity:" in self.char_abils) and (self.used_seed_of_animosity == False):
             targets = []
             for player in players[1:]:
                 if player.gender == "Male":
@@ -3272,6 +3450,35 @@ class Player:
                     print(
                         f"  >> Character Ability: Seed of Animosity; {self.character} has forced {target1.character} to DUEL against {target2.character} by discarding {card}!")
                     target1.activate_duel(card, target2)
+
+    def check_sow_dissension(self):
+        # "Sow Dissension: During your action phase, you can show an on-hand card and give it to any other player. They must either choose to lose one unit of health or show their entire hand and discard all cards of the same suit as the card you showed them. Limited to one use per turn."
+        if ("Sow Dissension:" in self.char_abils) and (self.used_sow_dissension == False):
+            if len(self.hand.contents) > 0:
+                target = random.choice(players[1:])
+                card = random.choice(self.hand.contents)
+                self.hand.contents.remove(card)
+                target.hand.add_to_top(card)
+                mode = random.choice(["Cards", "Health"])
+                self.used_sow_dissension = True
+                if mode == "Cards":
+                    print(
+                        f"  >> Character Ability: Sow Dissension; {self.character} has given {card} to {target.character}, and they discarded all cards of {card.suit} from their hand!")
+                    for i in target.hand.contents:
+                        if i.suit == card.suit:
+                            target.hand.contents.remove(i)
+                            target.hand.contents.insert(i, "Placeholder")
+                    while "Placeholder" in target.hand.contents:
+                        target.hand.contents.remove("Placeholder")
+                    target.check_one_after_another()
+                elif mode == "Health":
+                    target.current_health -= 1
+                    print(
+                        f"  >> Character Ability: Sow Dissension; {self.character} has given {card} to {target.character}, making them lose 1 health ({target.current_health}/{target.max_health} HP remaining)!")
+                    target.check_brink_of_death_loop(self)
+                    target.check_bequeathed_strategy(1)
+                    target.check_eye_for_an_eye(self)
+                    target.check_retaliation(self, 1)
 
     def check_surprise(self, card):
         # --- "Surprise: During your action phase, you can use any of your black-suited cards (on-hand or equipped) as DISMANTLE."
@@ -3400,6 +3607,8 @@ class Player:
             # Ability Checks; (adding extra actions!)
             if ("Benevolence:" in self.char_abils) and (self.used_benevolence == False):
                 actions.append("benevolence")
+            elif ("Ferocious Assault:" in self.char_abils) and (self.used_ferocious_assault == False) and (len(self.calculate_targets_in_weapon_range) > 0):
+                actions.append("ferocious_assault")
             elif ("Green Salve:" in self.char_abils):
                 actions.append("green_salve")
             elif ("Marriage:" in self.char_abils) and (self.used_marriage == False):
@@ -3433,6 +3642,8 @@ class Player:
                             actions.append("rouse")
             elif ("Seed of Animosity:" in self.char_abils) and (self.used_seed_of_animosity == False):
                 actions.append("seed_of_animosity")
+            elif ("Sow Dissension:" in self.char_abils) and (self.used_sow_dissension == False) and (len(self.hand.contents) > 0):
+                actions.append("sow_dissension")
             elif ("Surprise:" in self.char_abils):
                 for i in self.equipment:
                     if (i.suit == "\u2660") or (i.suit == "\u2663"):
@@ -3468,6 +3679,9 @@ class Player:
             elif card == "benevolence":
                 self.check_benevolence()
 
+            elif card == "ferocious_assault":
+                self.check_ferocious_assault()
+
             elif card == "green_salve":
                 self.check_green_salve()
 
@@ -3489,6 +3703,9 @@ class Player:
 
             elif card == "seed_of_animosity":
                 self.check_seed_of_animosity()
+
+            elif card == "sow_dissension":
+                self.check_sow_dissension()
 
             elif card == "trojan_flesh":
                 self.check_trojan_flesh()
@@ -3579,4 +3796,6 @@ class Player:
 # 'iterations' refers to the number of iterations that the game will run
 # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning // 3 by default
 # 'mode' refers to whether there are any player roles in-game // 0 = all rebels, 1 = normal roles, 2 = more spies
-play_games(num_players=5, num_iterations=1000, lightning_dmg=3, mode=1)
+# 'chars' refers to whether character cards will be used in game // True by default
+play_games(num_players=5, num_iterations=10000,
+           lightning_dmg=3, mode=1, chars=True)
