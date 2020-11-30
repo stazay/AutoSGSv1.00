@@ -11,10 +11,19 @@ Current Version: 29/11/2020
 Version 2.07
 
  + 29/11/2020 (v2.07);
- - Lots of bugs fixed... 
- - Lots to go... :(
+ - Bugfixes on:
+    - Cao Cao: Evil Hero
+    - Da Qiao: Displacement (and Player.calculate_targets_in_weapon_range())
+    - Dian Wei: Ferocious Assault
+    - Guo Jia: Bequeathed Strategy
+    - Sima Yi: Devil
+    - Sima Yi: Retaliation
+    - Xiahou Dun: Eye for an Eye
+    - Weapon: Huang's Longbow
+    - Weapon: Serpent Spear
 
  TO DO:
+ - Bugfixes required in Lu Bu's "Without Equal"
  - Ability to play vs CPU (random moves)
  - Ability to connect and play vs other players
 """
@@ -111,6 +120,7 @@ def generate_character_cards():
 def generate_deck():
     # The deck! (108 cards total)
     global main_deck
+    global serp_spear
     all_cards = [
         Card(1, 'A', '\u2660', 'Tool', 'Duel', 'You can target any player for a duel with this card. If the target does not play an ATTACK, they are damaged. If they do ATTACK, then you must play one in response or take damage. Whoever does not attack, takes damage.'),
         Card(1, 'A', '\u2660', 'Delay-Tool', 'Lightning', 'You can place this Delay-Tool on yourself. In your next turn, you will perform a judgement for this card; if it is between two and nine of \u2660 (inclusively), you recieve three units of lightning damage. If not, LIGHTNING passes to the next player.'),
@@ -320,7 +330,7 @@ def generate_deck():
         Card(13, 'K', '\u2666', '-1 Horse', '-1 Horse',
              'When equipped, this horse places other players closer to you in distance calculations by -1.')
     ]
-
+    serp_spear = all_cards[25]
     main_deck = Deck(all_cards)
     return main_deck
 
@@ -568,6 +578,7 @@ def check_judgement_tinkering(judgement_card, target):
         judgement_card = player.check_devil(judgement_card)
     for player in players[:target_index]:
         judgement_card = player.check_devil(judgement_card)
+    return judgement_card
 
 
 def check_negate_loop(given_list, card, source, reacting, og_card=None):
@@ -678,9 +689,6 @@ class Card:
             return f"[{self.effect} <:{self.weapon_range}:> - {self.val}{self.suit}]"
         else:
             return f"[{self.effect} - {self.val}{self.suit}]"
-
-    def __gt__(self, other):
-        return self.rank > other.rank
 
 
 # A class for handling the deck of cards in play
@@ -994,7 +1002,7 @@ class Player:
                 discard_deck.add_to_top(card)
                 self.current_health += 1
                 print(
-                    f"{self.character} has used a PEACH to heal by one from {self.current_health -1} to {self.current_health}.")
+                    f"{self.character} has used a PEACH to heal by one from {self.current_health -1} to {self.current_health}/{self.max_health}.")
                 self.check_one_after_another()
                 return True
             else:
@@ -1196,6 +1204,9 @@ class Player:
                     targets.remove(player)
                     break
 
+            if len(targets) < 1:
+                return False
+
             target = random.choice(targets)
             self.hand.contents.remove(card)
             discard_deck.add_to_top(card)
@@ -1257,6 +1268,8 @@ class Player:
                     targets.remove(player)
                     break
 
+            if len(targets) < 1:
+                return False
             target = random.choice(targets)
             for i in target.pending_judgements:
                 if i.effect2 == 'Acedia':
@@ -1497,12 +1510,8 @@ class Player:
                             possible_cards.append(i)
 
                 # Check for Serpent Spear
-                serp_spear = None
-                if (len(self.hand.contents) > 1):
-                    for serp_spear in self.equipment:
-                        if serp_spear.effect == "Serpent Spear":
-                            possible_cards.append(serp_spear)
-                            break
+                if (serp_spear in self.equipment) and (len(self.hand.contents) > 1):
+                    possible_cards.append(serp_spear)
 
                 # Choice of activation of response, and subsequent choice of card
                 if len(possible_cards) > 0:
@@ -1511,8 +1520,7 @@ class Player:
                     if activated:
                         attack = random.choice(possible_cards)
                         if attack == serp_spear:
-                            serp_spear = self.check_weapon_serpent_spear()
-                            attack, attack2 = serp_spear
+                            attack, attack2 = self.check_weapon_serpent_spear()
                         elif attack in self.equipment:
                             self.check_warrior_saint(attack)
                             self.equipment.remove(attack)
@@ -1615,12 +1623,8 @@ class Player:
                             possible_cards.append(i)
 
                 # Check for Serpent Spear
-                serp_spear = None
-                if (len(self.hand.contents) > 1):
-                    for serp_spear in self.equipment:
-                        if serp_spear.effect == "Serpent Spear":
-                            possible_cards.append(serp_spear)
-                            break
+                if (serp_spear in self.equipment) and (len(self.hand.contents) > 1):
+                    possible_cards.append(serp_spear)
 
                 # Choice of activation of response, and subsequent choice of card
                 if len(possible_cards) > 0:
@@ -1638,8 +1642,8 @@ class Player:
                                     player.rouse_requested = False
 
                         elif attack == serp_spear:
-                            serp_spear = self.check_weapon_serpent_spear()
-                            attack = serp_spear[0]
+                            attack = self.check_weapon_serpent_spear()
+                            attack[0] = attack
                             for player in players:
                                 player.rouse_requested = False
 
@@ -1732,8 +1736,8 @@ class Player:
 
             elif response_required == "Attack" and card.effect2 == "Duel":
                 required = 1
-                if source.check_without_equal():
-                    required += 1
+                # if source.check_without_equal():
+                #     required += 1
                 activated = False
 
                 while required > 0:
@@ -1771,12 +1775,8 @@ class Player:
                                 possible_cards.append(i)
 
                     # Check for Serpent Spear
-                    serp_spear = None
-                    if (len(self.hand.contents) > 1):
-                        for serp_spear in self.equipment:
-                            if serp_spear.effect == "Serpent Spear":
-                                possible_cards.append(serp_spear)
-                                break
+                    if (serp_spear in self.equipment) and (len(self.hand.contents) > 1):
+                        possible_cards.append(serp_spear)
 
                     # Choice of activation of response, and subsequent choice of card
                     if len(possible_cards) >= required:
@@ -1790,12 +1790,13 @@ class Player:
                                 if type(attack) == tuple:
                                     (attack, attack2) = attack
                                 if attack != "Repeat":
+                                    required -= 1
                                     for player in players:
                                         player.rouse_requested = False
 
                             elif attack == serp_spear:
-                                serp_spear = self.check_weapon_serpent_spear()
-                                attack = serp_spear[0]
+                                attack = self.check_weapon_serpent_spear()
+                                attack = attack[0]
                                 required -= 1
                                 for player in players:
                                     player.rouse_requested = False
@@ -1818,7 +1819,7 @@ class Player:
                                 self.check_one_after_another()
                                 if type(attack) == Card:
                                     attack.effect2 = "Attack"
-                                required -= 1
+                                    required -= 1
                                 for player in players:
                                     player.rouse_requested = False
 
@@ -1838,8 +1839,8 @@ class Player:
 
             elif response_required == "Defend" and ((card.effect2 == "Attack") or (card.effect2 == "Black Attack") or (card.effect2 == "Red Attack") or (card.effect2 == "Colourless Attack")):
                 required = 1
-                if source.check_without_equal():
-                    required += 1
+                # if source.check_without_equal():
+                #     required += 1
 
                 while required > 0:
                     defend = 0
@@ -2030,12 +2031,9 @@ class Player:
                 if i.effect == "Attack":
                     possible_cards.append(i)
 
-        serp_spear = None
-        if (len(self.hand.contents) > 1):
-            for serp_spear in self.equipment:
-                if serp_spear.effect == "Serpent Spear":
-                    possible_cards.append(serp_spear)
-                    break
+        # Check for Serpent Spear
+        if (serp_spear in self.equipment) and (len(self.hand.contents) > 1):
+            possible_cards.append(serp_spear)
 
         if (len(possible_cards) > 0):
             choices = [True, False]
@@ -2052,11 +2050,8 @@ class Player:
                     if card == "Repeat":
                         return self.activate_coerce(target)
                 elif card == serp_spear:
-                    serp_spear = self.check_weapon_serpent_spear()
-                    print(serp_spear)
-                    print(serp_spear[0])
-                    print(serp_spear[1])
-                    return self.activate_attack(serp_spear[0], target, serp_spear[1])
+                    card = self.check_weapon_serpent_spear()
+                    return self.activate_attack(card[0], target, card[1])
                 elif card in self.equipment:
                     self.check_warrior_saint(card)
                     self.equipment.remove(card)
@@ -2242,13 +2237,11 @@ class Player:
                     distance = len(players) - distance
                 if distance - (weapon_range + modifier) + (target_modifier) <= 0:
                     indexes.append(target_index)
-        if omit != None:
-            if omit in indexes:
-                indexes.remove(omit)
 
         output = []
         for index in indexes:
-            output.append(players[index])
+            if players[index] != omit:
+                output.append(players[index])
 
         return output
 
@@ -2326,7 +2319,8 @@ class Player:
                     self.check_envy_of_heaven()
                     print(
                         f"  >> Judgement: {self.character} flipped a {judgement_card}.")
-                    check_judgement_tinkering(judgement_card, self)
+                    judgement_card = check_judgement_tinkering(
+                        judgement_card, self)
 
                     if judgement_card.suit == "\u2665":
                         print(
@@ -2353,7 +2347,8 @@ class Player:
                     self.check_envy_of_heaven()
                     print(
                         f"  >> Judgement: {self.character} flipped a {judgement_card}.")
-                    check_judgement_tinkering(judgement_card, self)
+                    judgement_card = check_judgement_tinkering(
+                        judgement_card, self)
 
                     # IF JUDGEMENT OCCURS AND HITS PLAYER!
                     if (judgement_card.suit == "\u2660") and (10 > judgement_card.rank > 1):
@@ -2445,7 +2440,7 @@ class Player:
         if armor:
             if card.suit == "\u2660" or card.suit == "\u2663":
                 print(
-                    f"  >> {self.character} has {self.equipment[armor_index]} equipped, and therefore CANNOT be affected by black attack cards ({card} discarded as normal).")
+                    f"  >> {self.character} has {self.equipment[armor_index]} equipped, and therefore CANNOT be affected by black ATTACK cards ({card} discarded as normal).")
                 return True
         return False
 
@@ -2468,7 +2463,7 @@ class Player:
             self.check_envy_of_heaven()
             print(
                 f"  >> Judgement: {self.character} flipped a {judgement_card}.")
-            check_judgement_tinkering(judgement_card, self)
+            judgement_card = check_judgement_tinkering(judgement_card, self)
             if judgement_card.suit == "\u2665" or judgement_card.suit == "\u2666":
                 judgement_card.effect2 = "Defend"
                 return judgement_card
@@ -2625,7 +2620,7 @@ class Player:
                 weapon = True
                 break
 
-        if weapon:
+        if (weapon) and (target in players):
             choices = [True, False]
             activated = random.choice(choices)
             if activated:
@@ -2652,7 +2647,7 @@ class Player:
                 weapon = True
                 break
 
-        if weapon and (len(self.hand.contents) > 1):
+        if (weapon) and (len(self.hand.contents) > 1):
             card = self.discard()
             card2 = self.discard()
             if (card.suit == "\u2660" or card.suit == "\u2663") and (card2.suit == "\u2660" or card2.suit == "\u2663"):
@@ -2668,7 +2663,6 @@ class Player:
                 f"  >> {self.character} discarded two cards ({card}/{card2} to use as an ATTACK via {self.equipment[weapon_index]}!")
             self.check_one_after_another()
             return [card, card2]
-        return [False]
 
     def check_weapon_sky_scorcher_halberd(self, target):
         # 'target' refers to the target of the initial ATTACK card. They cannot be hit again via this weapon's effect!
@@ -2765,7 +2759,7 @@ class Player:
                     self.hand.contents.remove(card)
                     target.hand.add_to_top(card)
                 print(
-                    f"  >> Character Ability: Benevolence; {self.character} has given {cards_given} cards to {target.character}!")
+                    f"  >> Character Ability: Benevolence; {self.character} has given {cards_given} card(s) to {target.character}!")
                 if (cards_given > 1) and (self.max_health > self.current_health):
                     self.current_health += 1
                     print(
@@ -2774,7 +2768,7 @@ class Player:
     def check_bequeathed_strategy(self, damage):
         # --- "Bequeathed Strategy: For every one unit of damage you recieve, you can draw two cards from the deck. You can then choose to give away one, two or none of these cards to any player."
         # 'damage' refers to the amount of units of damage dealt (the amount of times this ability activates)
-        if ("Bequeathed Strategy" in self.char_abils) and (self.current_health > 0):
+        if ("Bequeathed Strategy" in self.char_abils) and (self in players):
             for i in range(damage):
                 choices = [True, False]
                 activated = random.choice(choices)
@@ -2892,7 +2886,8 @@ class Player:
                 judgement_card = discard_deck.contents[0]
                 print(
                     f"  >> Judgement: {self.character} flipped a {judgement_card}.")
-                check_judgement_tinkering(judgement_card, self)
+                judgement_card = check_judgement_tinkering(
+                    judgement_card, self)
                 self.draw(discard_deck, 1, False)
 
                 if judgement_card.suit == "\u2660" or judgement_card.suit == "\u2663":
@@ -2954,7 +2949,7 @@ class Player:
         # --- "Evil Hero: Whenever you are damaged by a card, you can immediately add it to your hand."
         # 'card' refers to the card that damaged the player
         # 'card2' refers to the any secondary card (if applicable) that damaged the player
-        if ("Evil Hero" in self.char_abils) and (self.current_health > 0):
+        if ("Evil Hero" in self.char_abils) and (self in players):
             if card in discard_deck.contents:
                 discard_deck.contents.remove(card)
                 self.hand.add_to_top(card)
@@ -2981,7 +2976,7 @@ class Player:
     def check_eye_for_an_eye(self, source):
         # --- "Eye for an Eye: For every instance that you suffer damage, you can flip a judgement card. If the judgement is not \u2665, the character that damaged you must choose between the following options; lose one unit of health, or discard any two on-hand cards."
         # 'source' refers to the person who damaged the user of this ability
-        if ("Eye for an Eye" in self.char_abils) and (self.current_health > 0):
+        if ("Eye for an Eye" in self.char_abils) and (self in players) and (source in players):
             choices = [True, False]
             activated = random.choice(choices)
             if activated:
@@ -2991,7 +2986,8 @@ class Player:
                 judgement_card = discard_deck.contents[0]
                 print(
                     f"  >> Judgement: {self.character} flipped a {judgement_card}.")
-                check_judgement_tinkering(judgement_card, self)
+                judgement_card = check_judgement_tinkering(
+                    judgement_card, self)
 
                 if (judgement_card.suit == "\u2665"):
                     print(
@@ -3013,6 +3009,7 @@ class Player:
                         card2 = source.discard()
                         print(
                             f"  >> Character Ability: Eye for an Eye; {source.character} has been forced to discard {card} and {card2}!")
+                        source.check_one_after_another()
 
     def check_false_ruler(self):
         # "False Ruler: You possess the same ruler ability as the current emperor."
@@ -3103,10 +3100,9 @@ class Player:
                 mode = random.choice(choices)
                 target = random.choice(players[1:])
                 if mode == "Health":
-                    self.current_health -= 1
-                    target.current_health -= 1
                     print(
-                        f"  >> Character Ability: Ferocious Assault; {self.character} has lost 1 health to damage {target.character} ({target.current_health}/{target.max_health} HP remaining)!")
+                        f"  >> Character Ability: Ferocious Assault; {self.character} has lost 1 health to damage {target.character} ({target.current_health - 1}/{target.max_health} HP remaining)!")
+                    self.current_health -= 1
                     self.check_brink_of_death_loop(None)
 
                 elif mode == "Weapon":
@@ -3116,10 +3112,12 @@ class Player:
                     else:
                         self.hand.contents.remove(weapon)
                     discard_deck.add_to_top(weapon)
-                    target.current_health -= 1
                     print(
-                        f"  >> Character Ability: Ferocious Assault; {self.character} has discarded {weapon} to damage {target.character} ({target.current_health}/{target.max_health} HP remaining)!")
+                        f"  >> Character Ability: Ferocious Assault; {self.character} has discarded {weapon} to damage {target.character} ({target.current_health - 1}/{target.max_health} HP remaining)!")
 
+                if check_win_conditions():
+                    return False
+                target.current_health -= 1
                 target.check_brink_of_death_loop(self)
                 target.check_bequeathed_strategy(1)
                 target.check_eye_for_an_eye(self)
@@ -3145,7 +3143,8 @@ class Player:
                 judgement_card = main_deck.remove_from_top()
                 print(
                     f"{self.character}'s judgement card is a {judgement_card}.")
-                check_judgement_tinkering(judgement_card, self)
+                judgement_card = check_judgement_tinkering(
+                    judgement_card, self)
 
                 if (judgement_card.suit == "\u2660") or (judgement_card.suit == "\u2663"):
                     cards_drawn.append(judgement_card)
@@ -3208,7 +3207,8 @@ class Player:
                 judgement_card = discard_deck.contents[0]
                 print(
                     f"  >> Judgement: {self.character} flipped a {judgement_card}.")
-                check_judgement_tinkering(judgement_card, self)
+                judgement_card = check_judgement_tinkering(
+                    judgement_card, self)
 
                 if (judgement_card.suit == "\u2665") or (judgement_card.suit == "\u2666"):
                     if self.check_weapon_frost_blade(target):
@@ -3398,7 +3398,7 @@ class Player:
         # ---"Retaliation: For every one unit of damage you recieve, you can take one card (whether on-hand or equipped) from the player who was the source of that damage."
         # 'source' refers to the source of the damage
         # 'damage' refers to the amount of units of damage dealt (the amount of times this ability activates)
-        if ("Retaliation" in self.char_abils) and (self.current_health > 0):
+        if ("Retaliation" in self.char_abils) and (self in players) and (source in players):
             total_cards = source.hand.contents + source.equipment
             while (damage > 0) and (len(total_cards) > 0):
                 choices = [True, False]
@@ -3680,12 +3680,9 @@ class Player:
                     if (i.suit == "\u2665") or (i.suit == "\u2666"):
                         actions.append(i)
 
-            # Serpent Spear Check
-            if (len(self.hand.contents) > 1) and (self.attacks_this_turn == 0):
-                for serp_spear in self.equipment:
-                    if serp_spear.effect == "Serpent Spear":
-                        actions.append("serp_spear")
-                        break
+            # Check for Serpent Spear
+            if (serp_spear in self.equipment) and (len(self.hand.contents) > 1):
+                actions.append("serp_spear")
 
             card = random.choice(actions)
             # print(f"Options: {actions}")
@@ -3698,8 +3695,8 @@ class Player:
                     return self.start_discard_phase()
 
             elif card == "serp_spear":
-                serp_spear = self.check_weapon_serpent_spear()
-                self.use_card_effect(serp_spear[0], serp_spear[1])
+                card = self.check_weapon_serpent_spear()
+                self.use_card_effect(card[0], card[1])
 
             elif card == "benevolence":
                 self.check_benevolence()
