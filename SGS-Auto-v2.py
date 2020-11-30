@@ -7,23 +7,15 @@
 /________// /_//|_||/_//  |___// /________// /________// /________//  /________// /_//  /_// /_//| || /_//
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
-Current Version: 29/11/2020
-Version 2.07
+Current Version: 30/11/2020
+Version 2.08
 
- + 29/11/2020 (v2.07);
+ + 30/11/2020 (v2.08);
  - Bugfixes on:
-    - Cao Cao: Evil Hero
-    - Da Qiao: Displacement (and Player.calculate_targets_in_weapon_range())
-    - Dian Wei: Ferocious Assault
-    - Guo Jia: Bequeathed Strategy
-    - Sima Yi: Devil
-    - Sima Yi: Retaliation
-    - Xiahou Dun: Eye for an Eye
-    - Weapon: Huang's Longbow
-    - Weapon: Serpent Spear
+    - Lu Bu: Without Equal (in DUELS)
 
  TO DO:
- - Bugfixes required in Lu Bu's "Without Equal"
+ - Test individual abilities~
  - Ability to play vs CPU (random moves)
  - Ability to connect and play vs other players
 """
@@ -884,6 +876,8 @@ class Player:
                         break
 
                 if len(targets) < 1:
+                    print(
+                        f"{card}/{card2} were returned to the {self.character} due to no possible targets.")
                     return False
                 else:
                     target = random.choice(targets)
@@ -910,6 +904,8 @@ class Player:
                         break
 
                 if len(targets) < 1:
+                    print(
+                        f"{card}/{card2} were returned to the {self.character} due to no possible targets.")
                     return False
                 else:
                     target = random.choice(targets)
@@ -936,6 +932,8 @@ class Player:
                         break
 
                 if len(targets) < 1:
+                    print(
+                        f"{card}/{card2} were returned to the {self.character} due to no possible targets.")
                     return False
                 else:
                     target = random.choice(targets)
@@ -1736,8 +1734,8 @@ class Player:
 
             elif response_required == "Attack" and card.effect2 == "Duel":
                 required = 1
-                # if source.check_without_equal():
-                #     required += 1
+                if source.check_without_equal():
+                    required += 1
                 activated = False
 
                 while required > 0:
@@ -1826,7 +1824,7 @@ class Player:
                         else:
                             print(f"{self.character} did not play an ATTACK!")
                             return True
-                    elif len(possible_cards) < 1:
+                    elif (required > len(possible_cards)):
                         print(f"{self.character} did not play an ATTACK!")
                         return True
 
@@ -1839,8 +1837,8 @@ class Player:
 
             elif response_required == "Defend" and ((card.effect2 == "Attack") or (card.effect2 == "Black Attack") or (card.effect2 == "Red Attack") or (card.effect2 == "Colourless Attack")):
                 required = 1
-                # if source.check_without_equal():
-                #     required += 1
+                if source.check_without_equal():
+                    required += 1
 
                 while required > 0:
                     defend = 0
@@ -3371,9 +3369,9 @@ class Player:
                     else:
                         self.hand.contents.remove(card)
                     discard_deck.add_to_top(card)
-                self.draw(main_deck, cards_changed, True)
                 print(
-                    f"  >> Character Ability: Reconsider; {self.character} has discarded {cards_changed}, then drew the same amount!")
+                    f"  >> Character Ability: Reconsider; {self.character} has discarded {cards_changed}, then drew the same amount! ({len(self.hand.contents)} cards total in-hand)")
+                self.draw(main_deck, cards_changed, False)
 
     def check_rescued(self, healer):
         # --- "Rescued (Ruler Ability): Whenever another member of Wu uses a PEACH to save you from the brink of death, it provides you with two units of health."
@@ -3391,7 +3389,7 @@ class Player:
         if "Restraint" in self.char_abils:
             if self.attacks_this_turn == 0:
                 print(
-                    f"  >> Character Ability: Restraint; {self.character} skips their discard phase.")
+                    f"  >> Character Ability: Restraint; {self.character} skips their discard phase ({len(self.hand.contents)} cards total in-hand).")
                 return True
 
     def check_retaliation(self, source, damage):
@@ -3834,5 +3832,5 @@ class Player:
 # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning // 3 by default
 # 'mode' refers to whether there are any player roles in-game // 0 = all rebels, 1 = normal roles, 2 = more spies
 # 'chars' refers to whether character cards will be used in game // True by default
-play_games(num_players=5, num_iterations=10000,
+play_games(num_players=3, num_iterations=10000,
            lightning_dmg=3, mode=1, chars=True)
