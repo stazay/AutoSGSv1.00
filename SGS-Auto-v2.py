@@ -11,7 +11,13 @@ Current Version: 07/12/2020
 Version 2.09
 
  + 07/12/2020 (v2.09);
+ - Bugfixes for Serpent Spear
  - Code cleanup for Axe
+ - Correct player-assignment for decisions made on the following:
+    - Gender Swords
+    - Xiahou Dun: Eye for an Eye
+    - Zhou Yu: Sow Dissension
+ - Added a dictionary that records basic stats for characters' win/loss
 
  TO DO:
  - Test individual abilities~
@@ -112,6 +118,7 @@ def generate_deck():
     # The deck! (108 cards total)
     global main_deck
     global serp_spear
+
     all_cards = [
         Card(1, 'A', '\u2660', 'Tool', 'Duel', 'You can target any player for a duel with this card. If the target does not play an ATTACK, they are damaged. If they do ATTACK, then you must play one in response or take damage. Whoever does not attack, takes damage.'),
         Card(1, 'A', '\u2660', 'Delay-Tool', 'Lightning', 'You can place this Delay-Tool on yourself. In your next turn, you will perform a judgement for this card; if it is between two and nine of \u2660 (inclusively), you recieve three units of lightning damage. If not, LIGHTNING passes to the next player.'),
@@ -321,7 +328,8 @@ def generate_deck():
         Card(13, 'K', '\u2666', '-1 Horse', '-1 Horse',
              'When equipped, this horse places other players closer to you in distance calculations by -1.')
     ]
-    serp_spear = all_cards[25]
+
+    serp_spear = all_cards[24]
     main_deck = Deck(all_cards)
     return main_deck
 
@@ -451,25 +459,20 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
     # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning // 3 by default
     # 'mode' refers to whether there are any player roles in-game // 0 = all rebels, 1 = normal roles, 2 = more spies
     # 'chars' refers to whether character cards will be used in game // True by default
+    global lightning_damage
+    global roles
+    global players
+    global main_deck
+    global discard_deck
+
+    # Basic Stats Recording~
     emp_and_co_wins = 0
     spy_wins = 0
     rebel_wins = 0
-    cao_cao_wins = 0
-    cao_cao_loss = 0
-    liu_bei_wins = 0
-    liu_bei_loss = 0
-    sun_quan_wins = 0
-    sun_quan_loss = 0
-    yuan_shao_wins = 0
-    yuan_shao_loss = 0
+    char_win = {}
+    char_loss = {}
 
     for i in range(num_iterations):
-        global lightning_damage
-        global roles
-        global players
-        global main_deck
-        global discard_deck
-
         if lightning_dmg > 3:
             lightning_dmg = 3
         if lightning_dmg < 0:
@@ -509,14 +512,7 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
                     for player in players_at_start:
                         if player.role == "Emperor" or player.role == "Advisor":
                             print(f"{player.role} - {player}")
-                            if player.character == "Cao Cao":
-                                cao_cao_wins += 1
-                            elif player.character == "Liu Bei":
-                                liu_bei_wins += 1
-                            elif player.character == "Sun Quan":
-                                sun_quan_wins += 1
-                            elif player.character == "Yuan Shao":
-                                yuan_shao_wins += 1
+                            player.won = True
 
                 elif roles_dict["Spy"] == 1 and roles_dict["Emperor"] == 0 and roles_dict["Advisor"] == 0 and roles_dict["Rebel"] == 0:
                     spy_wins += 1
@@ -525,16 +521,7 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
                     for player in players:
                         if player.role == "Spy":
                             print(f"{player.role} - {player}")
-                    for player in players_at_start:
-                        if player.role == "Emperor":
-                            if player.character == "Cao Cao":
-                                cao_cao_loss += 1
-                            elif player.character == "Liu Bei":
-                                liu_bei_loss += 1
-                            elif player.character == "Sun Quan":
-                                sun_quan_loss += 1
-                            elif player.character == "Yuan Shao":
-                                yuan_shao_loss += 1
+                            player.won = True
 
                 elif roles_dict["Emperor"] == 0:
                     rebel_wins += 1
@@ -543,25 +530,41 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
                     for player in players_at_start:
                         if player.role == "Rebel":
                             print(f"{player.role} - {player}")
-                    for player in players_at_start:
-                        if player.role == "Emperor":
-                            if player.character == "Cao Cao":
-                                cao_cao_loss += 1
-                            elif player.character == "Liu Bei":
-                                liu_bei_loss += 1
-                            elif player.character == "Sun Quan":
-                                sun_quan_loss += 1
-                            elif player.character == "Yuan Shao":
-                                yuan_shao_loss += 1
+                            player.won = True
 
                 print(f"Turn number: {players[0].turn_number}!")
+                if chars:
+                    for player in players_at_start:
+                        if player.won:
+                            if player.character in char_win:
+                                char_win[player.character] += 1
+                            else:
+                                char_win[player.character] = 1
+                        else:
+                            if player.character in char_loss:
+                                char_loss[player.character] += 1
+                            else:
+                                char_win[player.character] = 1
 
             elif len(players) == 1:
                 game_started = False
                 print(
                     "-------------------------------------<Game Over!>-------------------------------------")
                 print(f"{players[0]} has won the game!!!")
+                players[0].won = True
                 print(f"Turn number: {players[0].turn_number}!")
+                if chars:
+                    for player in players_at_start:
+                        if player.won:
+                            if player.character in char_win:
+                                char_win[player.character] += 1
+                            else:
+                                char_win[player.character] = 1
+                        else:
+                            if player.character in char_loss:
+                                char_loss[player.character] += 1
+                            else:
+                                char_win[player.character] = 1
 
             else:
                 players[0].start_beginning_phase()
@@ -582,21 +585,14 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
         print(f"{rebel_wins} - Rebel(s) won this many games")
         print("----------------------------------------------------------------------------------------------------")
         if chars:
-            if (cao_cao_wins + cao_cao_loss) > 0:
-                print(
-                    f"{(cao_cao_wins/(cao_cao_wins+cao_cao_loss))*100}% - Cao Cao won this percentage of games")
-            if (liu_bei_wins + liu_bei_loss) > 0:
-                print(
-                    f"{(liu_bei_wins/(liu_bei_wins+liu_bei_loss))*100}% - Liu Bei won this percentage of games")
-            if (sun_quan_wins + sun_quan_loss) > 0:
-                print(
-                    f"{(sun_quan_wins/(sun_quan_wins+sun_quan_loss))*100}% - Sun Quan won this percentage of games")
-            if (yuan_shao_wins + yuan_shao_loss) > 0:
-                print(
-                    f"{(yuan_shao_wins/(yuan_shao_wins+yuan_shao_loss))*100}% - Yuan Shao won this percentage of games")
-
+            print("Character wins:")
+            print(char_win)
+            print("Character losses:")
+            print(char_loss)
 
 # --- Loose Functions
+
+
 def get_player_index(target):
     for player_index, player in enumerate(players):
         if target == player:
@@ -810,6 +806,7 @@ class Player:
         self.lightning_immunity = False
         self.tools_immunity = False
         self.used_trigrams = False
+        self.won = False
 
     def __str__(self):
         if self.role == "Emperor":
@@ -2457,6 +2454,11 @@ class Player:
                 self.pending_judgements.append(pending_judgement)
                 return False
 
+    def check_decision(self, options):
+        # 'options' refers to the choices that this player will be presented with
+        output = random.choice(options)
+        return output
+
     def reset_once_per_turn(self):
         self.attacks_this_turn = 0
         self.acedia_active = False
@@ -2482,16 +2484,15 @@ class Player:
     def check_armor_black_shield(self, card):
         # 'card' refers to the ATTACK card used against the defending-player
         armor = False
-        for i_index, i in enumerate(self.equipment):
+        for i in self.equipment:
             if i.effect == "Black Shield":
-                armor_index = i_index
                 armor = True
                 break
 
         if armor:
             if card.suit == "\u2660" or card.suit == "\u2663":
                 print(
-                    f"  >> {self.character} has {self.equipment[armor_index]} equipped, and therefore CANNOT be affected by black ATTACK cards ({card} discarded as normal).")
+                    f"  >> {self.character} has {i} equipped, and therefore CANNOT be affected by black ATTACK cards ({card} discarded as normal).")
                 return True
         return False
 
@@ -2500,15 +2501,14 @@ class Player:
             return False
 
         armor = False
-        for i_index, i in enumerate(self.equipment):
+        for i in self.equipment:
             if i.effect == "Eight-Trigrams":
-                armor_index = i_index
                 armor = True
                 break
 
         if armor:
             print(
-                f"  >> {self.character} chose to activate their equipped {self.equipment[armor_index]} (armor); needs \u2665 or \u2666 to automatically dodge.")
+                f"  >> {self.character} chose to activate their equipped {i} (armor); needs \u2665 or \u2666 to automatically dodge.")
             main_deck.discard_from_deck()
             judgement_card = discard_deck.contents[0]
             self.check_envy_of_heaven()
@@ -2565,9 +2565,8 @@ class Player:
     def check_weapon_frost_blade(self, target):
         # 'target' refers to the target of the initial ATTACK card.
         weapon = False
-        for i_index, i in enumerate(self.equipment):
+        for i in self.equipment:
             if i.effect == "Frost Blade":
-                weapon_index = i_index
                 weapon = True
                 break
 
@@ -2578,7 +2577,7 @@ class Player:
                 activated = random.choice(choices)
                 if activated:
                     print(
-                        f"{self.character} has {self.equipment[weapon_index]} equipped, and chose to make {target.character} discard two cards instead of taking damage.")
+                        f"{self.character} has {i} equipped, and chose to make {target.character} discard two cards instead of taking damage.")
                     if len(total_cards) > 1:
                         total_cards = 2
                     else:
@@ -2596,9 +2595,8 @@ class Player:
     def check_weapon_gender_swords(self, target):
         # 'target' refers to the target of the initial ATTACK card.
         weapon = False
-        for i_index, i in enumerate(self.equipment):
+        for i in self.equipment:
             if i.effect == "Gender-Swords":
-                weapon_index = i_index
                 weapon = True
                 break
 
@@ -2606,27 +2604,26 @@ class Player:
             if self.gender != target.gender:
                 if len(target.hand.contents) > 0:
                     choices = ["Draw", "Discard"]
-                    choice = random.choice(choices)
+                    choice = target.check_decision(choices)
                     if choice == "Draw":
                         self.draw(main_deck, 1, False)
                         print(
-                            f"  >> {self.character} draws a card after attacking with {self.equipment[weapon_index]}.")
+                            f"  >> {self.character} draws a card after attacking with {i}.")
                     if choice == "Discard":
                         card = target.discard()
                         target.check_one_after_another()
                         print(
-                            f"  >> {target.character} discards {card} after being attacked by {self.equipment[weapon_index]}.")
+                            f"  >> {target.character} discards {card} after being attacked by {self.character} using {i}.")
                 else:
                     self.draw(main_deck, 1, False)
                     print(
-                        f"  >> {self.character} draws a card after attacking with {self.equipment[weapon_index]}.")
+                        f"  >> {self.character} draws a card after attacking with {i}.")
 
     def check_weapon_green_dragon_halberd(self, target):
         # 'target' refers to the target of the initial ATTACK card.
         weapon = False
-        for i_index, i in enumerate(self.equipment):
+        for i in self.equipment:
             if i.effect == "Green Dragon Halberd":
-                weapon_index = i_index
                 weapon = True
                 break
 
@@ -2646,16 +2643,15 @@ class Player:
                     self.check_one_after_another()
                     card.effect2 = "Attack"
                     print(
-                        f"  >> {self.character} attacked {target.character} again with {card}, using {self.equipment[weapon_index]}!")
+                        f"  >> {self.character} attacked {target.character} again with {card}, using {i}!")
                     self.activate_attack(card, target)
                     return True
 
     def check_weapon_huangs_longbow(self, target):
         # 'target' refers to the target of the initial ATTACK card.
         weapon = False
-        for i_index, i in enumerate(self.equipment):
+        for i in self.equipment:
             if i.effect == "Huang's Longbow":
-                weapon_index = i_index
                 weapon = True
                 break
 
@@ -2674,15 +2670,14 @@ class Player:
                     target.equipment.remove(horse_slain)
                     discard_deck.add_to_top(horse_slain)
                     print(
-                        f"  >> {self.character} has {self.equipment[weapon_index]} equipped, and therefore slays {horse_slain} of {target.character}!")
+                        f"  >> {self.character} has {i} equipped, and therefore slays {horse_slain} of {target.character}!")
                     target.check_warrior_woman()
                     return True
 
     def check_weapon_serpent_spear(self):
         weapon = False
-        for i_index, i in enumerate(self.equipment):
+        for i in self.equipment:
             if i.effect == "Serpent Spear":
-                weapon_index = i_index
                 weapon = True
                 break
 
@@ -2699,7 +2694,7 @@ class Player:
                 card.effect2 = "Colourless Attack"
                 card.effect2 = "Colourless Attack"
             print(
-                f"  >> {self.character} discarded two cards ({card}/{card2} to use as an ATTACK via {self.equipment[weapon_index]}!")
+                f"  >> {self.character} discarded two cards ({card}/{card2} to use as an ATTACK via {i}!")
             self.check_one_after_another()
             return [card, card2]
 
@@ -2707,15 +2702,14 @@ class Player:
         # 'target' refers to the target of the initial ATTACK card. They cannot be hit again via this weapon's effect!
         weapon = False
         if len(self.hand.contents) == 0:
-            for i_index, i in enumerate(self.equipment):
+            for i in self.equipment:
                 if i.effect == "Sky Scorcher Halberd":
-                    weapon_index = i_index
                     weapon = True
                     break
 
         if weapon:
             print(
-                f"  >> {self.character} has used their last hand-card to ATTACK {target.character} with {self.equipment[weapon_index]}. They can target up to two extra players!")
+                f"  >> {self.character} has used their last hand-card to ATTACK {target.character} with {i}. They can target up to two extra players!")
             targets = self.calculate_targets_in_weapon_range()
             targets.remove(target)
             if len(targets) < 1:
@@ -2738,10 +2732,10 @@ class Player:
         return 0
 
     def check_weapon_zhuge_crossbow(self):
-        for i_index, i in enumerate(self.equipment):
+        for i in self.equipment:
             if i.effect == "Zhuge Crossbow":
                 print(
-                    f"  >> {self.character} has {self.equipment[i_index]} equipped, and therefore has no limit to the amount of attacks per turn.")
+                    f"  >> {self.character} has {i} equipped, and therefore has no limit to the amount of attacks per turn.")
                 return True
 
     # Character Ability Checks
@@ -3035,15 +3029,15 @@ class Player:
                     choices = ["Health"]
                     if len(source.hand.contents) > 1:
                         choices.append("Cards")
-                    activated = random.choice(choices)
-                    if activated == "Health":
+                    choice = source.check_decision(choices)
+                    if choice == "Health":
                         source.current_health -= 1
                         print(
                             f"  >> Character Ability: Eye for an Eye; {source.character} has lost one health ({source.current_health}/{source.max_health} HP remaining)!")
                         source.check_brink_of_death_loop(self)
                         source.check_bequeathed_strategy(1)
                         source.check_retaliation(self, 1)
-                    elif activated == "Cards":
+                    elif choice == "Cards":
                         card = source.discard()
                         card2 = source.discard()
                         print(
@@ -3518,9 +3512,10 @@ class Player:
                 card = random.choice(self.hand.contents)
                 self.hand.contents.remove(card)
                 target.hand.add_to_top(card)
-                mode = random.choice(["Cards", "Health"])
+                choices = ["Cards", "Health"]
+                choice = target.check_decision(choices)
                 self.used_sow_dissension = True
-                if mode == "Cards":
+                if choice == "Cards":
                     print(
                         f"  >> Character Ability: Sow Dissension; {self.character} has given {card} to {target.character}, and they discarded all cards of {card.suit} from their hand!")
                     for i in target.hand.contents:
@@ -3530,7 +3525,7 @@ class Player:
                     while "Placeholder" in target.hand.contents:
                         target.hand.contents.remove("Placeholder")
                     target.check_one_after_another()
-                elif mode == "Health":
+                elif choice == "Health":
                     target.current_health -= 1
                     print(
                         f"  >> Character Ability: Sow Dissension; {self.character} has given {card} to {target.character}, making them lose 1 health ({target.current_health}/{target.max_health} HP remaining)!")
