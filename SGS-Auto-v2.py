@@ -2526,7 +2526,7 @@ class Player:
     def check_weapon_axe(self, target):
         # 'target' refers to the target of the initial ATTACK card.
         weapon = False
-        for i_index, i in enumerate(self.equipment):
+        for i in self.equipment:
             if i.effect == "Axe":
                 total_cards = self.hand.contents + self.equipment
                 if len(total_cards) > 2:
@@ -2537,8 +2537,7 @@ class Player:
             choices = [True, False]
             activated = random.choice(choices)
             if activated:
-                cards_to_discard = 2
-                total_cards -= i
+                total_cards.remove(i)
                 card = self.discard("Handquip")
                 card2 = self.discard("Handquip")
 
@@ -3873,5 +3872,5 @@ class Player:
 # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning // 3 by default
 # 'mode' refers to whether there are any player roles in-game // 0 = all rebels, 1 = normal roles, 2 = more spies
 # 'chars' refers to whether character cards will be used in game // True by default
-play_games(num_players=8, num_iterations=2,
+play_games(num_players=8, num_iterations=5000,
            lightning_dmg=3, mode=1, chars=True)
