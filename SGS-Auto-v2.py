@@ -7,12 +7,11 @@
 /________// /_//|_||/_//  |___// /________// /________// /________//  /________// /_//  /_// /_//| || /_//
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
-Current Version: 30/11/2020
-Version 2.08
+Current Version: 07/12/2020
+Version 2.09
 
- + 30/11/2020 (v2.08);
- - Bugfixes on:
-    - Lu Bu: Without Equal (in DUELS)
+ + 07/12/2020 (v2.09);
+ - Code cleanup for Axe
 
  TO DO:
  - Test individual abilities~
@@ -455,6 +454,14 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
     emp_and_co_wins = 0
     spy_wins = 0
     rebel_wins = 0
+    cao_cao_wins = 0
+    cao_cao_loss = 0
+    liu_bei_wins = 0
+    liu_bei_loss = 0
+    sun_quan_wins = 0
+    sun_quan_loss = 0
+    yuan_shao_wins = 0
+    yuan_shao_loss = 0
 
     for i in range(num_iterations):
         global lightning_damage
@@ -502,6 +509,14 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
                     for player in players_at_start:
                         if player.role == "Emperor" or player.role == "Advisor":
                             print(f"{player.role} - {player}")
+                            if player.character == "Cao Cao":
+                                cao_cao_wins += 1
+                            elif player.character == "Liu Bei":
+                                liu_bei_wins += 1
+                            elif player.character == "Sun Quan":
+                                sun_quan_wins += 1
+                            elif player.character == "Yuan Shao":
+                                yuan_shao_wins += 1
 
                 elif roles_dict["Spy"] == 1 and roles_dict["Emperor"] == 0 and roles_dict["Advisor"] == 0 and roles_dict["Rebel"] == 0:
                     spy_wins += 1
@@ -510,6 +525,16 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
                     for player in players:
                         if player.role == "Spy":
                             print(f"{player.role} - {player}")
+                    for player in players_at_start:
+                        if player.role == "Emperor":
+                            if player.character == "Cao Cao":
+                                cao_cao_loss += 1
+                            elif player.character == "Liu Bei":
+                                liu_bei_loss += 1
+                            elif player.character == "Sun Quan":
+                                sun_quan_loss += 1
+                            elif player.character == "Yuan Shao":
+                                yuan_shao_loss += 1
 
                 elif roles_dict["Emperor"] == 0:
                     rebel_wins += 1
@@ -518,6 +543,16 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
                     for player in players_at_start:
                         if player.role == "Rebel":
                             print(f"{player.role} - {player}")
+                    for player in players_at_start:
+                        if player.role == "Emperor":
+                            if player.character == "Cao Cao":
+                                cao_cao_loss += 1
+                            elif player.character == "Liu Bei":
+                                liu_bei_loss += 1
+                            elif player.character == "Sun Quan":
+                                sun_quan_loss += 1
+                            elif player.character == "Yuan Shao":
+                                yuan_shao_loss += 1
 
                 print(f"Turn number: {players[0].turn_number}!")
 
@@ -545,6 +580,20 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
         print(f"{emp_and_co_wins} - Emperor and Advisor(s) won this many games")
         print(f"{spy_wins} - Spy won this many games")
         print(f"{rebel_wins} - Rebel(s) won this many games")
+        print("----------------------------------------------------------------------------------------------------")
+        if chars:
+            if (cao_cao_wins + cao_cao_loss) > 0:
+                print(
+                    f"{(cao_cao_wins/(cao_cao_wins+cao_cao_loss))*100}% - Cao Cao won this percentage of games")
+            if (liu_bei_wins + liu_bei_loss) > 0:
+                print(
+                    f"{(liu_bei_wins/(liu_bei_wins+liu_bei_loss))*100}% - Liu Bei won this percentage of games")
+            if (sun_quan_wins + sun_quan_loss) > 0:
+                print(
+                    f"{(sun_quan_wins/(sun_quan_wins+sun_quan_loss))*100}% - Sun Quan won this percentage of games")
+            if (yuan_shao_wins + yuan_shao_loss) > 0:
+                print(
+                    f"{(yuan_shao_wins/(yuan_shao_wins+yuan_shao_loss))*100}% - Yuan Shao won this percentage of games")
 
 
 # --- Loose Functions
@@ -2038,6 +2087,7 @@ class Player:
             activated = random.choice(choices)
             if activated:
                 card = random.choice(possible_cards)
+                card2 = None
                 if card == "Rouse":
                     card = self.check_rouse()
                     if type(card) == tuple:
@@ -2053,19 +2103,22 @@ class Player:
                 elif card in self.equipment:
                     self.check_warrior_saint(card)
                     self.equipment.remove(card)
+                    discard_deck.add_to_top(card)
                 else:
                     self.check_dragon_heart_def_to_atk(card)
                     self.check_warrior_saint(card)
                     self.hand.contents.remove(card)
-                discard_deck.add_to_top(card)
-                card.effect2 = "Attack"
+                    discard_deck.add_to_top(card)
                 print(
                     f"{self.character} was coerced into attacking {target.character}.")
                 self.check_one_after_another()
                 extra_targets = self.check_weapon_sky_scorcher_halberd(
                     target)
                 if (extra_targets == 0):
-                    self.activate_attack(card, target)
+                    if card2 == None:
+                        self.activate_attack(card, target)
+                    else:
+                        self.activate_attack(card, target, card2)
                 elif (extra_targets[0] == 1):
                     self.activate_attack(card, target)
                     self.activate_attack(card, extra_targets[1])
@@ -2485,27 +2538,16 @@ class Player:
             activated = random.choice(choices)
             if activated:
                 cards_to_discard = 2
-                while cards_to_discard > 1:
-                    card = self.discard("Handquip")
-                    if card.effect == "Axe":
-                        discard_deck.contents.remove(card)
-                        self.equipment.insert(i_index, card)
-                    else:
-                        cards_to_discard -= 1
-                while cards_to_discard > 0:
-                    card2 = self.discard("Handquip")
-                    if card2.effect == "Axe":
-                        discard_deck.contents.remove(card2)
-                        self.equipment.insert(i_index, card2)
-                    else:
-                        cards_to_discard -= 1
+                total_cards -= i
+                card = self.discard("Handquip")
+                card2 = self.discard("Handquip")
 
                 damage_dealt = 1
                 if self.used_bare_the_chest:
                     damage_dealt += 1
                 target.current_health -= damage_dealt
                 print(
-                    f"  >> {self.character} has forced the damage to {target.character}, by using their [Axe <:3:> - 5\u2666], and discarding two cards ({target.current_health}/{target.max_health} HP remaining).")
+                    f"  >> {self.character} has forced the damage to {target.character}, by using their {i}, and discarding two cards ({target.current_health}/{target.max_health} HP remaining).")
                 self.check_one_after_another()
                 for player in players:
                     if player.current_health < 1:
@@ -3140,7 +3182,7 @@ class Player:
             while activated:
                 judgement_card = main_deck.remove_from_top()
                 print(
-                    f"{self.character}'s judgement card is a {judgement_card}.")
+                    f"  >> {self.character}'s judgement card is a {judgement_card}.")
                 judgement_card = check_judgement_tinkering(
                     judgement_card, self)
 
@@ -3279,7 +3321,7 @@ class Player:
         # 'card' refers to the card being used as an ACEDIA
         if "National Colours" in self.char_abils:
             print(
-                f"  >> Character Ability: National Colours; {self.character} has used {card} as ACEDIA.")
+                f"  >> Character Ability: National Colours; {self.character} has attempted to use {card} as ACEDIA.")
             card.effect2 = "Acedia"
             return True
 
@@ -3369,9 +3411,9 @@ class Player:
                     else:
                         self.hand.contents.remove(card)
                     discard_deck.add_to_top(card)
+                self.draw(main_deck, cards_changed, False)
                 print(
                     f"  >> Character Ability: Reconsider; {self.character} has discarded {cards_changed}, then drew the same amount! ({len(self.hand.contents)} cards total in-hand)")
-                self.draw(main_deck, cards_changed, False)
 
     def check_rescued(self, healer):
         # --- "Rescued (Ruler Ability): Whenever another member of Wu uses a PEACH to save you from the brink of death, it provides you with two units of health."
@@ -3503,7 +3545,7 @@ class Player:
         # 'card' refers to the card being used as an DISMANTLE
         if "Surprise" in self.char_abils:
             print(
-                f"  >> Character Ability: Surprise; {self.character} has used {card} as DISMANTLE.")
+                f"  >> Character Ability: Surprise; {self.character} has attempted to use {card} as DISMANTLE.")
             card.effect2 = "Dismantle"
             return True
 
@@ -3530,7 +3572,7 @@ class Player:
         if "Warrior Saint" in self.char_abils:
             if (card.suit == "\u2665") or (card.suit == "\u2666"):
                 print(
-                    f"  >> Character Ability: Warrior Saint; {self.character} has used {card} as ATTACK.")
+                    f"  >> Character Ability: Warrior Saint; {self.character} has attempted to use {card} as ATTACK.")
                 card.effect2 = "Attack"
                 return True
 
@@ -3546,7 +3588,7 @@ class Player:
         if "Wisdom" in self.char_abils:
             print(
                 f"  >> Character Ability: Wisdom; {self.character} immediately draws a card from the deck after using a non-delay tool card.")
-            self.draw(main_deck, 1, True)
+            self.draw(main_deck, 1, False)
 
     def check_without_equal(self):
         # "Without Equal: Whenever you use ATTACK, your target has to use two DEFEND cards to successfully evade the attack. During a DUEL, your opponent has to use two ATTACK cards for every one ATTACK card that you use."
@@ -3645,8 +3687,7 @@ class Player:
                               "\u2665": 0, "\u2666": 0}
                 suits = []
                 for i in self.hand.contents:
-                    card_suit = i.suit
-                    same_cards[card_suit] += 1
+                    same_cards[i.suit] += 1
                 for suit in same_cards:
                     if same_cards[suit] > 1:
                         suits.append(suit)
@@ -3832,5 +3873,5 @@ class Player:
 # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning // 3 by default
 # 'mode' refers to whether there are any player roles in-game // 0 = all rebels, 1 = normal roles, 2 = more spies
 # 'chars' refers to whether character cards will be used in game // True by default
-play_games(num_players=3, num_iterations=10000,
+play_games(num_players=8, num_iterations=2,
            lightning_dmg=3, mode=1, chars=True)
