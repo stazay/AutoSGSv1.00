@@ -7,17 +7,11 @@
 /________// /_//|_||/_//  |___// /________// /________// /________//  /________// /_//  /_// /_//| || /_//
                                 SanGuoSha Coding by Saba Tazayoni               /||______________| ||
                     Started: 21/07/2020                                        /___________________||
-Current Version: 07/12/2020
-Version 2.09
+Current Version: 09/12/2020
+Version 2.10
 
- + 07/12/2020 (v2.09);
- - Bugfixes for Serpent Spear
- - Code cleanup for Axe
- - Correct player-assignment for decisions made on the following:
-    - Gender Swords
-    - Xiahou Dun: Eye for an Eye
-    - Zhou Yu: Sow Dissension
- - Added a dictionary that records basic stats for characters' win/loss
+ + 09/12/2020 (v2.10);
+ - Stats Dictionaries reworked...!
 
  TO DO:
  - Test individual abilities~
@@ -469,8 +463,10 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
     emp_and_co_wins = 0
     spy_wins = 0
     rebel_wins = 0
-    char_win = {}
-    char_loss = {}
+    emp_char_wins = {}
+    adv_char_wins = {}
+    spy_char_wins = {}
+    reb_char_wins = {}
 
     for i in range(num_iterations):
         if lightning_dmg > 3:
@@ -512,7 +508,7 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
                     for player in players_at_start:
                         if player.role == "Emperor" or player.role == "Advisor":
                             print(f"{player.role} - {player}")
-                            player.won = True
+                            player.game_won = True
 
                 elif roles_dict["Spy"] == 1 and roles_dict["Emperor"] == 0 and roles_dict["Advisor"] == 0 and roles_dict["Rebel"] == 0:
                     spy_wins += 1
@@ -521,7 +517,7 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
                     for player in players:
                         if player.role == "Spy":
                             print(f"{player.role} - {player}")
-                            player.won = True
+                            player.game_won = True
 
                 elif roles_dict["Emperor"] == 0:
                     rebel_wins += 1
@@ -530,21 +526,9 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
                     for player in players_at_start:
                         if player.role == "Rebel":
                             print(f"{player.role} - {player}")
-                            player.won = True
+                            player.game_won = True
 
                 print(f"Turn number: {players[0].turn_number}!")
-                if chars:
-                    for player in players_at_start:
-                        if player.won:
-                            if player.character in char_win:
-                                char_win[player.character] += 1
-                            else:
-                                char_win[player.character] = 1
-                        else:
-                            if player.character in char_loss:
-                                char_loss[player.character] += 1
-                            else:
-                                char_win[player.character] = 1
 
             elif len(players) == 1:
                 game_started = False
@@ -553,18 +537,6 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
                 print(f"{players[0]} has won the game!!!")
                 players[0].won = True
                 print(f"Turn number: {players[0].turn_number}!")
-                if chars:
-                    for player in players_at_start:
-                        if player.won:
-                            if player.character in char_win:
-                                char_win[player.character] += 1
-                            else:
-                                char_win[player.character] = 1
-                        else:
-                            if player.character in char_loss:
-                                char_loss[player.character] += 1
-                            else:
-                                char_win[player.character] = 1
 
             else:
                 players[0].start_beginning_phase()
@@ -576,6 +548,46 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
                     # If dead at end of turn
                     players.pop(0)
 
+        # More Stats Recording~
+        if chars:
+            for player in players_at_start:
+                if player.role == "Emperor":
+                    if player.character in emp_char_wins:
+                        if player.game_won:
+                            emp_char_wins[player.character][0] += 1
+                            emp_char_wins[player.character][1] += 1
+                        else:
+                            emp_char_wins[player.character][1] += 1
+                    else:
+                        emp_char_wins[player.character] = [0, 0]
+                elif player.role == "Advisor":
+                    if player.character in adv_char_wins:
+                        if player.game_won:
+                            adv_char_wins[player.character][0] += 1
+                            adv_char_wins[player.character][1] += 1
+                        else:
+                            adv_char_wins[player.character][1] += 1
+                    else:
+                        adv_char_wins[player.character] = [0, 0]
+                elif player.role == "Spy":
+                    if player.character in spy_char_wins:
+                        if player.game_won:
+                            spy_char_wins[player.character][0] += 1
+                            spy_char_wins[player.character][1] += 1
+                        else:
+                            spy_char_wins[player.character][1] += 1
+                    else:
+                        spy_char_wins[player.character] = [0, 0]
+                else:
+                    if player.character in reb_char_wins:
+                        if player.game_won:
+                            reb_char_wins[player.character][0] += 1
+                            reb_char_wins[player.character][1] += 1
+                        else:
+                            reb_char_wins[player.character][1] += 1
+                    else:
+                        reb_char_wins[player.character] = [0, 0]
+
     # Final win-results tally
     if roles != 0:
         print("----------------------------------------------------------------------------------------------------")
@@ -585,14 +597,27 @@ def play_games(num_players, num_iterations, lightning_dmg=3, mode=1, chars=True)
         print(f"{rebel_wins} - Rebel(s) won this many games")
         print("----------------------------------------------------------------------------------------------------")
         if chars:
-            print("Character wins:")
-            print(char_win)
-            print("Character losses:")
-            print(char_loss)
+            win_dicts = [emp_char_wins, adv_char_wins,
+                         spy_char_wins, reb_char_wins]
+            role_names = ["Emperor", "Advisor", "Spy", "Rebel"]
+            for win_dict in win_dicts:
+                for i in win_dict:
+                    char_wins = win_dict.get(i)[0]
+                    char_games = win_dict.get(i)[1]
+                    win_dict[i] = (char_wins/char_games)*100
+                sorted_tuples = sorted(
+                    win_dict.items(), key=lambda item: item[1])
+                sorted_dict = {k: v for k, v in sorted_tuples}
+                for i in sorted_dict:
+                    sorted_dict[i] = int(sorted_dict[i])
+                    print(
+                        f"Win rate for {i} as {role_names[0]} is {sorted_dict[i]}%")
+                role_names.pop(0)
+                print(
+                    "----------------------------------------------------------------------------------------------------")
+
 
 # --- Loose Functions
-
-
 def get_player_index(target):
     for player_index, player in enumerate(players):
         if target == player:
@@ -806,7 +831,7 @@ class Player:
         self.lightning_immunity = False
         self.tools_immunity = False
         self.used_trigrams = False
-        self.won = False
+        self.game_won = False
 
     def __str__(self):
         if self.role == "Emperor":
@@ -3679,12 +3704,12 @@ class Player:
             elif ("Random Strike" in self.char_abils):
                 same_cards = {"\u2660": 0, "\u2663": 0,
                               "\u2665": 0, "\u2666": 0}
-                suits = []
-                for i in self.hand.contents:
-                    same_cards[i.suit] += 1
+                usable_suits = []
+                for card in self.hand.contents:
+                    same_cards[card.suit] += 1
                 for suit in same_cards:
                     if same_cards[suit] > 1:
-                        suits.append(suit)
+                        usable_suits.append(suit)
             elif ("Reconsider" in self.char_abils):
                 actions.append("reconsider")
             elif ("Rouse (Ruler Ability)" in self.char_abils) and ((self.role == "Emperor") or ("False Ruler" in self.char_abils)):
@@ -3788,7 +3813,7 @@ class Player:
                             f"  >> Character Ability: Dual Heroes; {self.character} uses {card} as DUEL!")
                         card.effect2 = "Duel"
 
-                elif ("Random Strike" in self.char_abils) and (card.suit in suits):
+                elif ("Random Strike" in self.char_abils) and (card.suit in usable_suits):
                     choices = [True, False]
                     activated = random.choice(choices)
                     if activated:
@@ -3867,5 +3892,10 @@ class Player:
 # 'lightning_dmg' refers to the amount of damage a player takes when hit by lightning // 3 by default
 # 'mode' refers to whether there are any player roles in-game // 0 = all rebels, 1 = normal roles, 2 = more spies
 # 'chars' refers to whether character cards will be used in game // True by default
-play_games(num_players=8, num_iterations=5000,
-           lightning_dmg=3, mode=1, chars=True)
+play_games(
+    num_players=5,
+    num_iterations=20000,
+    lightning_dmg=3,
+    mode=1,
+    chars=True
+)
